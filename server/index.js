@@ -29,11 +29,14 @@ async function seedProducts() {
 
   if (count === 0) {
     const products = [
-      ['Wireless Headphones', 'Premium noise-cancelling over-ear headphones with 30-hour battery life', 79.99, 'https://placehold.co/300x300?text=Headphones'],
-      ['Running Shoes', 'Lightweight breathable running shoes with responsive cushioning', 129.99, 'https://placehold.co/300x300?text=Shoes'],
-      ['Backpack', 'Water-resistant laptop backpack with padded compartment', 49.99, 'https://placehold.co/300x300?text=Backpack'],
-      ['Smart Watch', 'Fitness tracker with heart rate monitor and 7-day battery', 199.99, 'https://placehold.co/300x300?text=Watch'],
-      ['Coffee Maker', '12-cup programmable coffee maker with thermal carafe', 89.99, 'https://placehold.co/300x300?text=Coffee'],
+      ['Braided Wig', 'Premium quality braided wig, ready to wear', 25000, 'https://placehold.co/300x300?text=Braided+Wig'],
+      ['Curly Hair Extension', 'Natural-looking curly hair extension, soft and fluffy', 15000, 'https://placehold.co/300x300?text=Curly+Hair'],
+      ['Raw Honey (1L)', 'Pure organic honey sourced from local Nigerian farms', 5000, 'https://placehold.co/300x300?text=Honey+1L'],
+      ['Honey (500ml)', 'Pure organic honey, perfect for daily use', 3000, 'https://placehold.co/300x300?text=Honey+500ml'],
+      ['Plantain Chips (Spicy)', 'Crispy spicy plantain chips, loved by everyone', 1500, 'https://placehold.co/300x300?text=Spicy+Chips'],
+      ['Plantain Chips (Classic)', 'Classic salted plantain chips, timeless taste', 1200, 'https://placehold.co/300x300?text=Classic+Chips'],
+      ['Plantain Chips (Jollof)', 'Jollof-flavored plantain chips, a Nigerian favorite', 1800, 'https://placehold.co/300x300?text=Jollof+Chips'],
+      ['Coconut Hair Oil', 'Nourishing coconut oil for healthy shiny hair', 3500, 'https://placehold.co/300x300?text=Coconut+Oil'],
     ];
 
     for (const [name, desc, price, img] of products) {
@@ -43,7 +46,7 @@ async function seedProducts() {
       );
     }
     saveDb();
-    console.log('Seeded 5 sample products');
+    console.log('Seeded 8 sample products');
   }
 }
 
