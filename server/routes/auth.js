@@ -24,6 +24,18 @@ router.post('/signup', async (req, res) => {
     db.run('INSERT INTO users (email, password, full_name) VALUES (?, ?, ?)', [email, hash, full_name || '']);
     saveDb();
 
+    const userName = full_name || email;
+    const adminResult = db.exec('SELECT id FROM users WHERE is_admin = 1');
+    if (adminResult.length > 0) {
+      adminResult[0].values.forEach(row => {
+        db.run(
+          'INSERT INTO notifications (user_id, message, type) VALUES (?, ?, ?)',
+          [row[0], `New user ${userName} registered (${email})`, 'user']
+        );
+      });
+      saveDb();
+    }
+
     res.status(201).json({ message: 'Account created' });
   } catch (err) {
     res.status(500).json({ error: err.message });

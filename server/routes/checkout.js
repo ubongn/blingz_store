@@ -175,6 +175,21 @@ router.post('/', async (req, res) => {
         'UPDATE products SET stock = stock - ? WHERE id = ?',
         [item.quantity, item.product_id]
       );
+
+      const newStock = item.stock - item.quantity;
+      if (newStock <= 5) {
+        const prodResult = db.exec('SELECT name FROM products WHERE id = ?', [item.product_id]);
+        const prodName = prodResult.length > 0 && prodResult[0].values.length > 0 ? prodResult[0].values[0][0] : 'Product';
+        const adminResult = db.exec('SELECT id FROM users WHERE is_admin = 1');
+        if (adminResult.length > 0) {
+          adminResult[0].values.forEach(row => {
+            db.run(
+              'INSERT INTO notifications (user_id, message, type) VALUES (?, ?, ?)',
+              [row[0], `Low stock: ${prodName} has only ${newStock} left`, 'stock']
+            );
+          });
+        }
+      }
     }
 
     if (coupon_code) {
@@ -185,6 +200,17 @@ router.post('/', async (req, res) => {
       'INSERT INTO notifications (user_id, message, type) VALUES (?, ?, ?)',
       [req.userId, `Your order #${orderId} has been placed successfully`, 'order']
     );
+
+    const adminResult = db.exec('SELECT id FROM users WHERE is_admin = 1');
+    if (adminResult.length > 0) {
+      const userName = full_name || 'A customer';
+      adminResult[0].values.forEach(row => {
+        db.run(
+          'INSERT INTO notifications (user_id, message, type) VALUES (?, ?, ?)',
+          [row[0], `New order #${orderId} placed by ${userName}`, 'order']
+        );
+      });
+    }
 
     db.run('DELETE FROM cart WHERE user_id = ?', [req.userId]);
     saveDb();
