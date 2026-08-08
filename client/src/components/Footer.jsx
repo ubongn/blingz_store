@@ -14,9 +14,9 @@ export default function Footer() {
             <h4 className="text-white font-semibold mb-3">Quick Links</h4>
             <ul className="space-y-2 list-none p-0 m-0">
               <li><Link to="/" className="text-gray-400 hover:text-white no-underline text-sm">Home</Link></li>
+              <li><Link to="/about" className="text-gray-400 hover:text-white no-underline text-sm">About</Link></li>
+              <li><Link to="/contact" className="text-gray-400 hover:text-white no-underline text-sm">Contact</Link></li>
               <li><Link to="/cart" className="text-gray-400 hover:text-white no-underline text-sm">Cart</Link></li>
-              <li><Link to="/login" className="text-gray-400 hover:text-white no-underline text-sm">Login</Link></li>
-              <li><Link to="/signup" className="text-gray-400 hover:text-white no-underline text-sm">Signup</Link></li>
             </ul>
           </div>
 
