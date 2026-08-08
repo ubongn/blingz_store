@@ -11,15 +11,17 @@ export default function ProductDetail() {
   const { id } = useParams();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedImage, setSelectedImage] = useState('');
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const { isLoggedIn, setCartCount } = useAuth();
+  const { isLoggedIn } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     apiFetch(`/products/${id}`).then(data => {
       setProduct(data);
+      setSelectedImage(data.image_url || '');
       setLoading(false);
     });
   }, [id]);
@@ -107,7 +109,28 @@ export default function ProductDetail() {
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="grid grid-cols-1 md:grid-cols-2">
-          <img src={product.image_url} alt={product.name} className="w-full h-80 md:h-full object-cover" />
+          <div>
+            <img src={selectedImage || product.image_url} alt={product.name} className="w-full h-80 md:h-96 object-cover" />
+            {product.images && product.images.length > 0 && (
+              <div className="flex gap-2 p-3 border-t border-gray-100">
+                <button
+                  onClick={() => setSelectedImage(product.image_url)}
+                  className={`w-16 h-16 rounded-lg overflow-hidden border-2 flex-shrink-0 cursor-pointer p-0 ${selectedImage === product.image_url ? 'border-gray-900' : 'border-transparent'}`}
+                >
+                  <img src={product.image_url} alt="" className="w-full h-full object-cover" />
+                </button>
+                {product.images.map(img => (
+                  <button
+                    key={img.id}
+                    onClick={() => setSelectedImage(img.image_url)}
+                    className={`w-16 h-16 rounded-lg overflow-hidden border-2 flex-shrink-0 cursor-pointer p-0 ${selectedImage === img.image_url ? 'border-gray-900' : 'border-transparent'}`}
+                  >
+                    <img src={img.image_url} alt="" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <div className="p-8 flex flex-col justify-center">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">{product.name}</h1>
             {product.category && (

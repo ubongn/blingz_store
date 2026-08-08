@@ -21,6 +21,7 @@ import About from './pages/About';
 import Contact from './pages/Contact';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import AdminDashboard from './pages/AdminDashboard';
 import ScrollToTop from './components/ScrollToTop';
 
 function App() {
@@ -46,6 +47,7 @@ function App() {
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/orders" element={<OrderHistory />} />
           <Route path="/orders/:id" element={<OrderDetail />} />
+          <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/products" element={<AdminProducts />} />
           <Route path="/admin/orders" element={<AdminOrders />} />
           <Route path="/admin/coupons" element={<AdminCoupons />} />

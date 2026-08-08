@@ -2,11 +2,40 @@ const express = require('express');
 const Stripe = require('stripe');
 const { getDb, saveDb } = require('../db');
 const { auth } = require('../middleware/auth');
+const { sendEmail, orderConfirmationEmail } = require('../utils/email');
 
 const router = express.Router();
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
 router.use(auth);
+
+router.get('/suggest-coupons', async (req, res) => {
+  try {
+    const db = await getDb();
+    const result = db.exec(
+      `SELECT code, discount_type, discount_value, min_order_amount, expires_at
+       FROM coupons
+       WHERE is_active = 1 AND (max_uses = 0 OR used_count < max_uses)
+       AND (expires_at IS NULL OR expires_at >= datetime('now'))
+       ORDER BY discount_value DESC`
+    );
+
+    if (result.length === 0) return res.json([]);
+
+    const coupons = result[0].values.map(row => ({
+      code: row[0],
+      discount_type: row[1],
+      discount_value: row[2],
+      min_order_amount: row[3],
+      label: row[1] === 'percentage' ? `${row[2]}% off` : `₦${row[2]} off`,
+      min_label: row[3] > 0 ? `Min. order ₦${row[3]}` : null,
+    }));
+
+    res.json(coupons);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 router.post('/create-payment-intent', async (req, res) => {
   try {
@@ -216,6 +245,17 @@ router.post('/', async (req, res) => {
     saveDb();
 
     res.status(201).json({ message: 'Order placed', orderId });
+
+    const emailItems = cartItems.map(item => {
+      const nameResult = db.exec('SELECT name FROM products WHERE id = ?', [item.product_id]);
+      const name = nameResult.length > 0 && nameResult[0].values.length > 0 ? nameResult[0].values[0][0] : 'Product';
+      return { name, quantity: item.quantity, price: item.price };
+    });
+    const userEmailResult = db.exec('SELECT email FROM users WHERE id = ?', [req.userId]);
+    const userEmail = userEmailResult.length > 0 && userEmailResult[0].values.length > 0 ? userEmailResult[0].values[0][0] : null;
+    if (userEmail) {
+      sendEmail(userEmail, `Order #${orderId} Confirmed`, orderConfirmationEmail(full_name, orderId, total, emailItems));
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

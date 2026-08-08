@@ -110,6 +110,7 @@ async function getDb() {
   `);
 
   try { db.run("ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0"); } catch(e) {}
+  try { db.run("ALTER TABLE users ADD COLUMN avatar_url TEXT DEFAULT ''"); } catch(e) {}
   try { db.run("ALTER TABLE orders ADD COLUMN payment_status TEXT DEFAULT 'pending'"); } catch(e) {}
   try { db.run("ALTER TABLE orders ADD COLUMN payment_method TEXT DEFAULT ''"); } catch(e) {}
   try { db.run("ALTER TABLE orders ADD COLUMN stripe_payment_intent_id TEXT DEFAULT ''"); } catch(e) {}
@@ -152,6 +153,17 @@ async function getDb() {
       used INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS product_images (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id INTEGER NOT NULL,
+      image_url TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
     )
   `);
 

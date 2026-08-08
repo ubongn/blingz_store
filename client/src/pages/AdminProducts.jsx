@@ -13,6 +13,8 @@ export default function AdminProducts() {
   const [form, setForm] = useState({ name: '', description: '', price: '', image_url: '', category: 'Hair', stock: '' });
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
+  const [galleryFiles, setGalleryFiles] = useState([]);
+  const [galleryImages, setGalleryImages] = useState([]);
   const [uploading, setUploading] = useState(false);
   const { isLoggedIn, user } = useAuth();
   const navigate = useNavigate();
@@ -44,6 +46,8 @@ export default function AdminProducts() {
     setForm({ name: '', description: '', price: '', image_url: '', category: 'Hair', stock: '' });
     setImageFile(null);
     setImagePreview('');
+    setGalleryFiles([]);
+    setGalleryImages([]);
     setShowForm(true);
   }
 
@@ -59,6 +63,14 @@ export default function AdminProducts() {
     });
     setImageFile(null);
     setImagePreview(product.image_url || '');
+    setGalleryFiles([]);
+    apiFetch(`/api/admin/products`).then(data => {
+      if (Array.isArray(data)) {
+        const found = data.find(p => p.id === product.id);
+        if (found && found.images) setGalleryImages(found.images);
+        else setGalleryImages([]);
+      }
+    });
     setShowForm(true);
   }
 
@@ -67,6 +79,37 @@ export default function AdminProducts() {
     if (!file) return;
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
+  }
+
+  function handleGalleryChange(e) {
+    const files = Array.from(e.target.files);
+    setGalleryFiles(prev => [...prev, ...files]);
+  }
+
+  function removeGalleryFile(index) {
+    setGalleryFiles(prev => prev.filter((_, i) => i !== index));
+  }
+
+  async function uploadGalleryImages(productId) {
+    if (galleryFiles.length === 0) return;
+    const fd = new FormData();
+    galleryFiles.forEach(f => fd.append('images', f));
+    await fetch(`http://localhost:5000/api/admin/products/${productId}/images`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      body: fd,
+    });
+    setGalleryFiles([]);
+  }
+
+  async function deleteGalleryImage(imageId) {
+    const res = await apiFetch(`/api/admin/products/images/${imageId}`, { method: 'DELETE' });
+    if (res.error) {
+      toast.error(res.error);
+    } else {
+      setGalleryImages(prev => prev.filter(img => img.id !== imageId));
+      toast.success('Image removed');
+    }
   }
 
   async function handleSubmit(e) {
@@ -116,6 +159,10 @@ export default function AdminProducts() {
     if (res.error) {
       toast.error(res.error);
     } else {
+      const productId = editingProduct ? editingProduct.id : res.id;
+      if (productId && galleryFiles.length > 0) {
+        await uploadGalleryImages(productId);
+      }
       toast.success(editingProduct ? 'Product updated' : 'Product created');
       setShowForm(false);
       loadProducts();
@@ -236,6 +283,47 @@ export default function AdminProducts() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
                 />
               </div>
+
+              {editingProduct && (
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Additional Images</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleGalleryChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:bg-gray-900 file:text-white file:text-sm file:cursor-pointer"
+                  />
+                  {(galleryImages.length > 0 || galleryFiles.length > 0) && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {galleryImages.map(img => (
+                        <div key={img.id} className="relative group">
+                          <img src={img.image_url} alt="" className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
+                          <button
+                            type="button"
+                            onClick={() => deleteGalleryImage(img.id)}
+                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer border-none"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                      {galleryFiles.map((file, i) => (
+                        <div key={i} className="relative group">
+                          <img src={URL.createObjectURL(file)} alt="" className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
+                          <button
+                            type="button"
+                            onClick={() => removeGalleryFile(i)}
+                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer border-none"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex gap-3">
               <button

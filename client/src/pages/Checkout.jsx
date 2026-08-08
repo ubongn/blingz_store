@@ -94,6 +94,7 @@ export default function Checkout() {
   const [discountAmount, setDiscountAmount] = useState(0);
   const [couponLoading, setCouponLoading] = useState(false);
   const [clientSecret, setClientSecret] = useState('');
+  const [suggestedCoupons, setSuggestedCoupons] = useState([]);
   const { isLoggedIn, refreshCart } = useAuth();
   const navigate = useNavigate();
 
@@ -109,6 +110,9 @@ export default function Checkout() {
       }
       setItems(data);
       setLoading(false);
+    });
+    apiFetch('/checkout/suggest-coupons').then(data => {
+      if (Array.isArray(data)) setSuggestedCoupons(data);
     });
   }, [isLoggedIn, navigate]);
 
@@ -141,6 +145,24 @@ export default function Checkout() {
     setAppliedCoupon(null);
     setDiscountAmount(0);
     setCouponCode('');
+  }
+
+  async function applyCouponDirect(code) {
+    setCouponLoading(true);
+    const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const res = await apiFetch('/checkout/validate-coupon', {
+      method: 'POST',
+      body: JSON.stringify({ code, orderAmount: subtotal }),
+    });
+    setCouponLoading(false);
+
+    if (res.error) {
+      toast.error(res.error);
+    } else {
+      setAppliedCoupon(res);
+      setDiscountAmount(res.discount_amount);
+      toast.success(`Coupon applied! You save ₦${res.discount_amount.toFixed(2)}`);
+    }
   }
 
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -212,6 +234,25 @@ export default function Checkout() {
               </div>
             )}
           </div>
+
+          {suggestedCoupons.length > 0 && !appliedCoupon && (
+            <div className="mt-3">
+              <p className="text-xs text-gray-500 mb-2">Available coupons:</p>
+              <div className="flex flex-wrap gap-2">
+                {suggestedCoupons.map(coupon => (
+                  <button
+                    key={coupon.code}
+                    type="button"
+                    onClick={() => { setCouponCode(coupon.code); applyCouponDirect(coupon.code); }}
+                    className="inline-flex items-center gap-1 px-3 py-1 bg-green-50 border border-green-200 rounded-full text-xs text-green-700 hover:bg-green-100 cursor-pointer transition-colors"
+                  >
+                    <span className="font-medium">{coupon.code}</span>
+                    <span>— {coupon.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="mt-4 border-t border-gray-200 pt-4 space-y-2">
             <div className="flex justify-between text-sm">

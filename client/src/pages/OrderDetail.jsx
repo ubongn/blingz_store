@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiCheck } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../api';
+import toast from 'react-hot-toast';
 
 const STATUS_STEPS = ['Processing', 'Shipped', 'Delivered'];
 
@@ -10,6 +11,7 @@ export default function OrderDetail() {
   const { id } = useParams();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [cancelling, setCancelling] = useState(false);
   const { isLoggedIn } = useAuth();
   const navigate = useNavigate();
 
@@ -23,6 +25,19 @@ export default function OrderDetail() {
       setLoading(false);
     });
   }, [id, isLoggedIn, navigate]);
+
+  async function handleCancel() {
+    if (!confirm('Are you sure you want to cancel this order?')) return;
+    setCancelling(true);
+    const res = await apiFetch(`/orders/${id}/cancel`, { method: 'PUT' });
+    setCancelling(false);
+    if (res.error) {
+      toast.error(res.error);
+    } else {
+      toast.success('Order cancelled');
+      setOrder({ ...order, status: 'Cancelled' });
+    }
+  }
 
   if (loading) {
     return (
@@ -51,7 +66,26 @@ export default function OrderDetail() {
 
       <h2 className="text-2xl font-bold text-gray-900 mb-6">Order #{order.id}</h2>
 
-      {/* Order Tracking */}
+      {/* Cancel Button */}
+      {order.status === 'Processing' && (
+        <div className="mb-6">
+          <button
+            onClick={handleCancel}
+            disabled={cancelling}
+            className="bg-red-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 cursor-pointer border-none"
+          >
+            {cancelling ? 'Cancelling...' : 'Cancel Order'}
+          </button>
+        </div>
+      )}
+
+      {order.status === 'Cancelled' ? (
+        <div className="bg-red-50 rounded-xl border border-red-200 p-6 mb-6 text-center">
+          <p className="text-red-600 font-semibold text-lg">This order has been cancelled</p>
+          <p className="text-red-500 text-sm mt-1">Stock has been restored for all items.</p>
+        </div>
+      ) : (
+      /* Order Tracking */
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
         <h3 className="font-semibold text-gray-900 mb-4">Order Status</h3>
         <div className="flex items-center justify-between">
@@ -69,6 +103,7 @@ export default function OrderDetail() {
           ))}
         </div>
       </div>
+      )}
 
       {/* Order Info */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

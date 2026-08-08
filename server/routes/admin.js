@@ -4,6 +4,7 @@ const path = require('path');
 const { getDb, saveDb } = require('../db');
 const { auth } = require('../middleware/auth');
 const { admin } = require('../middleware/admin');
+const { sendEmail, orderShippedEmail, orderDeliveredEmail } = require('../utils/email');
 
 const router = express.Router();
 
@@ -26,6 +27,25 @@ const upload = multer({
   },
 });
 
+const galleryStorage = multer.diskStorage({
+  destination: path.join(__dirname, '..', 'uploads'),
+  filename: (req, file, cb) => {
+    const unique = Date.now() + '-gallery-' + Math.round(Math.random() * 1e9);
+    cb(null, unique + path.extname(file.originalname));
+  },
+});
+const galleryUpload = multer({
+  storage: galleryStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = /jpeg|jpg|png|gif|webp/;
+    const ext = allowed.test(path.extname(file.originalname).toLowerCase());
+    const mime = allowed.test(file.mimetype);
+    if (ext && mime) cb(null, true);
+    else cb(new Error('Only image files are allowed'));
+  },
+});
+
 router.post('/upload', upload.single('image'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded' });
@@ -35,6 +55,72 @@ router.post('/upload', upload.single('image'), (req, res) => {
 });
 
 router.use(auth, admin);
+
+// ─── Dashboard Stats ───
+
+router.get('/stats', async (req, res) => {
+  try {
+    const db = await getDb();
+
+    const usersResult = db.exec('SELECT COUNT(*) FROM users');
+    const totalUsers = usersResult.length > 0 ? usersResult[0].values[0][0] : 0;
+
+    const ordersResult = db.exec('SELECT COUNT(*) FROM orders');
+    const totalOrders = ordersResult.length > 0 ? ordersResult[0].values[0][0] : 0;
+
+    const revenueResult = db.exec("SELECT COALESCE(SUM(total), 0) FROM orders WHERE payment_status = 'paid'");
+    const totalRevenue = revenueResult.length > 0 ? revenueResult[0].values[0][0] : 0;
+
+    const productsResult = db.exec('SELECT COUNT(*) FROM products');
+    const totalProducts = productsResult.length > 0 ? productsResult[0].values[0][0] : 0;
+
+    const statusResult = db.exec("SELECT status, COUNT(*) FROM orders GROUP BY status");
+    const ordersByStatus = {};
+    if (statusResult.length > 0) {
+      statusResult[0].values.forEach(([status, count]) => {
+        ordersByStatus[status] = count;
+      });
+    }
+
+    const recentResult = db.exec(
+      `SELECT o.id, o.full_name, o.total, o.status, o.created_at, u.email
+       FROM orders o JOIN users u ON o.user_id = u.id
+       ORDER BY o.created_at DESC LIMIT 5`
+    );
+    const recentOrders = [];
+    if (recentResult.length > 0) {
+      const cols = recentResult[0].columns;
+      recentOrders.push(...recentResult[0].values.map(row => {
+        const obj = {};
+        cols.forEach((col, i) => { obj[col] = row[i]; });
+        return obj;
+      }));
+    }
+
+    const lowStockResult = db.exec('SELECT id, name, stock FROM products WHERE stock <= 5 ORDER BY stock ASC LIMIT 5');
+    const lowStockProducts = [];
+    if (lowStockResult.length > 0) {
+      const cols = lowStockResult[0].columns;
+      lowStockProducts.push(...lowStockResult[0].values.map(row => {
+        const obj = {};
+        cols.forEach((col, i) => { obj[col] = row[i]; });
+        return obj;
+      }));
+    }
+
+    res.json({
+      totalUsers,
+      totalOrders,
+      totalRevenue,
+      totalProducts,
+      ordersByStatus,
+      recentOrders,
+      lowStockProducts,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ─── Coupons ───
 
@@ -183,9 +269,45 @@ router.put('/products/:id', async (req, res) => {
 router.delete('/products/:id', async (req, res) => {
   try {
     const db = await getDb();
+    db.run('DELETE FROM product_images WHERE product_id = ?', [req.params.id]);
     db.run('DELETE FROM products WHERE id = ?', [req.params.id]);
     saveDb();
     res.json({ message: 'Product deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/products/:id/images', galleryUpload.array('images', 10), async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'No files uploaded' });
+    }
+    const db = await getDb();
+    const maxOrder = db.exec('SELECT COALESCE(MAX(sort_order), 0) FROM product_images WHERE product_id = ?', [req.params.id]);
+    let order = maxOrder.length > 0 ? maxOrder[0].values[0][0] + 1 : 0;
+
+    for (const file of req.files) {
+      const url = `http://localhost:5000/uploads/${file.filename}`;
+      db.run('INSERT INTO product_images (product_id, image_url, sort_order) VALUES (?, ?, ?)',
+        [req.params.id, url, order++]);
+    }
+    saveDb();
+
+    const result = db.exec('SELECT id, image_url, sort_order FROM product_images WHERE product_id = ? ORDER BY sort_order', [req.params.id]);
+    const images = result.length > 0 ? result[0].values.map(row => ({ id: row[0], image_url: row[1], sort_order: row[2] })) : [];
+    res.json(images);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/products/images/:imageId', async (req, res) => {
+  try {
+    const db = await getDb();
+    db.run('DELETE FROM product_images WHERE id = ?', [req.params.imageId]);
+    saveDb();
+    res.json({ message: 'Image deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -222,13 +344,37 @@ router.put('/orders/:id/status', async (req, res) => {
   try {
     const { status } = req.body;
 
-    if (!['Processing', 'Shipped', 'Delivered'].includes(status)) {
+    if (!['Processing', 'Shipped', 'Delivered', 'Cancelled'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }
 
     const db = await getDb();
+
+    if (status === 'Cancelled') {
+      const itemsResult = db.exec('SELECT product_id, quantity FROM order_items WHERE order_id = ?', [req.params.id]);
+      if (itemsResult.length > 0) {
+        itemsResult[0].values.forEach(([productId, quantity]) => {
+          db.run('UPDATE products SET stock = stock + ? WHERE id = ?', [quantity, productId]);
+        });
+      }
+    }
+
     db.run('UPDATE orders SET status = ? WHERE id = ?', [status, req.params.id]);
     saveDb();
+
+    if (status === 'Shipped' || status === 'Delivered') {
+      const orderResult = db.exec(
+        `SELECT o.full_name, u.email FROM orders o JOIN users u ON o.user_id = u.id WHERE o.id = ?`,
+        [req.params.id]
+      );
+      if (orderResult.length > 0 && orderResult[0].values.length > 0) {
+        const [name, email] = orderResult[0].values[0];
+        if (email) {
+          const template = status === 'Shipped' ? orderShippedEmail(name, req.params.id) : orderDeliveredEmail(name, req.params.id);
+          sendEmail(email, `Order #${req.params.id} ${status}`, template);
+        }
+      }
+    }
 
     res.json({ message: 'Order status updated' });
   } catch (err) {

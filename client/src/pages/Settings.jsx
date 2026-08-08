@@ -119,6 +119,36 @@ export default function Settings() {
         </form>
       </div>
 
+      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+        <h3 className="font-semibold text-gray-900 mb-4">Notification Preferences</h3>
+        <div className="space-y-3">
+          <label className="flex items-center justify-between cursor-pointer">
+            <span className="text-sm text-gray-700">Push notifications for new orders</span>
+            <input
+              type="checkbox"
+              checked={localStorage.getItem('notif_orders') !== 'false'}
+              onChange={(e) => {
+                localStorage.setItem('notif_orders', e.target.checked);
+                toast.success('Preference saved');
+              }}
+              className="w-4 h-4 text-gray-900 rounded focus:ring-gray-900"
+            />
+          </label>
+          <label className="flex items-center justify-between cursor-pointer">
+            <span className="text-sm text-gray-700">Push notifications for promotions</span>
+            <input
+              type="checkbox"
+              checked={localStorage.getItem('notif_promos') !== 'false'}
+              onChange={(e) => {
+                localStorage.setItem('notif_promos', e.target.checked);
+                toast.success('Preference saved');
+              }}
+              className="w-4 h-4 text-gray-900 rounded focus:ring-gray-900"
+            />
+          </label>
+        </div>
+      </div>
+
       {!user?.is_admin && (
         <>
           <div className="bg-white rounded-xl border border-red-200 p-6">

@@ -3,10 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../api';
 import toast from 'react-hot-toast';
+import { FiCamera } from 'react-icons/fi';
 
 export default function Profile() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { isLoggedIn, setUser } = useAuth();
@@ -21,6 +24,7 @@ export default function Profile() {
       if (data && !data.error) {
         setFullName(data.full_name || '');
         setEmail(data.email || '');
+        setAvatarUrl(data.avatar_url || '');
       }
       setLoading(false);
     });
@@ -41,7 +45,31 @@ export default function Profile() {
       toast.error(res.error);
     } else {
       toast.success('Profile updated');
-      setUser({ ...useAuth().user, full_name: fullName, email });
+      setUser({ ...useAuth().user, full_name: fullName, email, avatar_url: avatarUrl });
+    }
+  }
+
+  async function handleAvatarUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploading(true);
+    const fd = new FormData();
+    fd.append('avatar', file);
+    const res = await fetch('http://localhost:5000/api/profile/avatar', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      body: fd,
+    });
+    const data = await res.json();
+    setUploading(false);
+
+    if (data.error) {
+      toast.error(data.error);
+    } else {
+      setAvatarUrl(data.url);
+      setUser({ ...useAuth().user, avatar_url: data.url });
+      toast.success('Avatar updated');
     }
   }
 
@@ -56,6 +84,34 @@ export default function Profile() {
   return (
     <div className="max-w-lg mx-auto px-4 py-8">
       <h2 className="text-2xl font-bold text-gray-900 mb-6">My Profile</h2>
+
+      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <div className="w-20 h-20 rounded-full bg-gray-900 text-white flex items-center justify-center text-2xl font-bold overflow-hidden">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                fullName ? fullName.charAt(0).toUpperCase() : email.charAt(0).toUpperCase()
+              )}
+            </div>
+            <label className="absolute bottom-0 right-0 bg-white border border-gray-200 rounded-full p-1.5 cursor-pointer hover:bg-gray-50 shadow-sm">
+              <FiCamera className="w-4 h-4 text-gray-600" />
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarUpload}
+                className="hidden"
+              />
+            </label>
+          </div>
+          <div>
+            <p className="font-semibold text-gray-900">{fullName || 'No name set'}</p>
+            <p className="text-sm text-gray-500">{email}</p>
+            {uploading && <p className="text-xs text-gray-400 mt-1">Uploading...</p>}
+          </div>
+        </div>
+      </div>
 
       <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
         <div>

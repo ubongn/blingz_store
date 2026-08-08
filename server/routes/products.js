@@ -125,6 +125,21 @@ router.get('/:id', async (req, res) => {
       ? Math.round(avgResult[0].values[0][0] * 10) / 10
       : 0;
 
+    const imagesResult = db.exec(
+      'SELECT id, image_url, sort_order FROM product_images WHERE product_id = ? ORDER BY sort_order',
+      [req.params.id]
+    );
+    if (imagesResult.length > 0) {
+      const imgCols = imagesResult[0].columns;
+      product.images = imagesResult[0].values.map(row => {
+        const obj = {};
+        imgCols.forEach((col, i) => { obj[col] = row[i]; });
+        return obj;
+      });
+    } else {
+      product.images = [];
+    }
+
     res.json(product);
   } catch (err) {
     res.status(500).json({ error: err.message });

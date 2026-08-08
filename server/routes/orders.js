@@ -1,5 +1,5 @@
 const express = require('express');
-const { getDb } = require('../db');
+const { getDb, saveDb } = require('../db');
 const { auth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -70,6 +70,39 @@ router.get('/:id', async (req, res) => {
     }
 
     res.json(order);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.put('/:id/cancel', async (req, res) => {
+  try {
+    const db = await getDb();
+    const result = db.exec(
+      'SELECT id, status FROM orders WHERE id = ? AND user_id = ?',
+      [req.params.id, req.userId]
+    );
+
+    if (result.length === 0 || result[0].values.length === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const status = result[0].values[0][1];
+    if (status !== 'Processing') {
+      return res.status(400).json({ error: 'Only processing orders can be cancelled' });
+    }
+
+    db.run('UPDATE orders SET status = ? WHERE id = ?', ['Cancelled', req.params.id]);
+
+    const itemsResult = db.exec('SELECT product_id, quantity FROM order_items WHERE order_id = ?', [req.params.id]);
+    if (itemsResult.length > 0) {
+      itemsResult[0].values.forEach(([productId, quantity]) => {
+        db.run('UPDATE products SET stock = stock + ? WHERE id = ?', [quantity, productId]);
+      });
+    }
+
+    saveDb();
+    res.json({ message: 'Order cancelled' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

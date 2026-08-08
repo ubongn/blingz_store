@@ -1,11 +1,33 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
+const multer = require('multer');
+const path = require('path');
 const jwt = require('jsonwebtoken');
 const { getDb, saveDb } = require('../db');
 const { JWT_SECRET, auth } = require('../middleware/auth');
+const { sendEmail, welcomeEmail } = require('../utils/email');
 
 const router = express.Router();
+
+const avatarStorage = multer.diskStorage({
+  destination: path.join(__dirname, '..', 'uploads'),
+  filename: (req, file, cb) => {
+    const unique = Date.now() + '-avatar-' + Math.round(Math.random() * 1e9);
+    cb(null, unique + path.extname(file.originalname));
+  },
+});
+const avatarUpload = multer({
+  storage: avatarStorage,
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = /jpeg|jpg|png|gif|webp/;
+    const ext = allowed.test(path.extname(file.originalname).toLowerCase());
+    const mime = allowed.test(file.mimetype);
+    if (ext && mime) cb(null, true);
+    else cb(new Error('Only image files are allowed'));
+  },
+});
 
 router.post('/signup', async (req, res) => {
   try {
@@ -38,6 +60,7 @@ router.post('/signup', async (req, res) => {
     }
 
     res.status(201).json({ message: 'Account created' });
+    sendEmail(email, 'Welcome to BlingzStore!', welcomeEmail(full_name || email.split('@')[0]));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -75,7 +98,7 @@ router.post('/login', async (req, res) => {
 router.get('/profile', auth, async (req, res) => {
   try {
     const db = await getDb();
-    const result = db.exec('SELECT id, email, full_name, is_admin FROM users WHERE id = ?', [req.userId]);
+    const result = db.exec('SELECT id, email, full_name, is_admin, avatar_url FROM users WHERE id = ?', [req.userId]);
 
     if (result.length === 0 || result[0].values.length === 0) {
       return res.status(404).json({ error: 'User not found' });
@@ -101,6 +124,21 @@ router.put('/profile', auth, async (req, res) => {
     saveDb();
 
     res.json({ message: 'Profile updated' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/profile/avatar', auth, avatarUpload.single('avatar'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    const url = `http://localhost:5000/uploads/${req.file.filename}`;
+    const db = await getDb();
+    db.run('UPDATE users SET avatar_url = ? WHERE id = ?', [url, req.userId]);
+    saveDb();
+    res.json({ url });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

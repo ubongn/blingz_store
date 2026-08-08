@@ -68,6 +68,9 @@ export default function Navbar() {
             <>
               {user?.is_admin === 1 ? (
                 <>
+                  <Link to="/admin" className="text-gray-600 hover:text-gray-900 no-underline text-sm font-medium">
+                    Dashboard
+                  </Link>
                   <Link to="/admin/products" className="text-gray-600 hover:text-gray-900 no-underline text-sm font-medium">
                     Products
                   </Link>
@@ -148,8 +151,12 @@ export default function Navbar() {
                   onClick={() => setDropdownOpen(!dropdownOpen)}
                   className="flex items-center gap-2 bg-transparent border-none cursor-pointer p-0"
                 >
-                  <div className="bg-gray-900 text-white rounded-full w-10 h-10 flex items-center justify-center font-medium text-sm">
-                    {getInitials(user?.full_name)}
+                  <div className="bg-gray-900 text-white rounded-full w-10 h-10 flex items-center justify-center font-medium text-sm overflow-hidden">
+                    {user?.avatar_url ? (
+                      <img src={user.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      getInitials(user?.full_name)
+                    )}
                   </div>
                   <FiChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
