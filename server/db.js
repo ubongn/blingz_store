@@ -22,9 +22,12 @@ async function getDb() {
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       email TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL
+      password TEXT NOT NULL,
+      full_name TEXT DEFAULT ''
     )
   `);
+
+  try { db.run('ALTER TABLE users ADD COLUMN full_name TEXT DEFAULT ""'); } catch(e) {}
 
   db.run(`
     CREATE TABLE IF NOT EXISTS products (
@@ -32,9 +35,14 @@ async function getDb() {
       name TEXT NOT NULL,
       description TEXT,
       price REAL NOT NULL,
-      image_url TEXT
+      image_url TEXT,
+      category TEXT DEFAULT '',
+      stock INTEGER DEFAULT 0
     )
   `);
+
+  try { db.run('ALTER TABLE products ADD COLUMN category TEXT DEFAULT ""'); } catch(e) {}
+  try { db.run('ALTER TABLE products ADD COLUMN stock INTEGER DEFAULT 0'); } catch(e) {}
 
   db.run(`
     CREATE TABLE IF NOT EXISTS cart (
@@ -56,10 +64,13 @@ async function getDb() {
       city TEXT NOT NULL,
       phone TEXT NOT NULL,
       total REAL NOT NULL,
+      status TEXT DEFAULT 'Processing',
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (user_id) REFERENCES users(id)
     )
   `);
+
+  try { db.run("ALTER TABLE orders ADD COLUMN status TEXT DEFAULT 'Processing'"); } catch(e) {}
 
   db.run(`
     CREATE TABLE IF NOT EXISTS order_items (
@@ -70,6 +81,31 @@ async function getDb() {
       price REAL NOT NULL,
       FOREIGN KEY (order_id) REFERENCES orders(id),
       FOREIGN KEY (product_id) REFERENCES products(id)
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS reviews (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      product_id INTEGER NOT NULL,
+      rating INTEGER NOT NULL,
+      comment TEXT DEFAULT '',
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (product_id) REFERENCES products(id)
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS wishlist (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      product_id INTEGER NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (product_id) REFERENCES products(id),
+      UNIQUE(user_id, product_id)
     )
   `);
 
