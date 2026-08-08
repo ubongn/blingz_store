@@ -10,7 +10,7 @@ router.get('/', async (req, res) => {
   try {
     const db = await getDb();
     const result = db.exec(
-      `SELECT id, full_name, address, city, phone, total, status, created_at
+      `SELECT id, full_name, address, city, phone, total, status, payment_status, payment_method, coupon_code, discount_amount, created_at
        FROM orders
        WHERE user_id = ?
        ORDER BY created_at DESC`,
@@ -36,7 +36,7 @@ router.get('/:id', async (req, res) => {
   try {
     const db = await getDb();
     const result = db.exec(
-      `SELECT id, full_name, address, city, phone, total, status, created_at
+      `SELECT id, full_name, address, city, phone, total, status, payment_status, payment_method, coupon_code, discount_amount, created_at
        FROM orders
        WHERE id = ? AND user_id = ?`,
       [req.params.id, req.userId]

@@ -62,7 +62,7 @@ router.post('/login', async (req, res) => {
 router.get('/profile', auth, async (req, res) => {
   try {
     const db = await getDb();
-    const result = db.exec('SELECT id, email, full_name FROM users WHERE id = ?', [req.userId]);
+    const result = db.exec('SELECT id, email, full_name, is_admin FROM users WHERE id = ?', [req.userId]);
 
     if (result.length === 0 || result[0].values.length === 0) {
       return res.status(404).json({ error: 'User not found' });
