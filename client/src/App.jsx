@@ -19,10 +19,12 @@ import AdminUsers from './pages/AdminUsers';
 import Settings from './pages/Settings';
 import About from './pages/About';
 import Contact from './pages/Contact';
+import ScrollToTop from './components/ScrollToTop';
 
 function App() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+      <ScrollToTop />
       <Navbar />
       <div className="flex-1">
         <Routes>
