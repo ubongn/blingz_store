@@ -17,7 +17,7 @@ router.post('/', async (req, res) => {
     const db = await getDb();
 
     const cartResult = db.exec(
-      `SELECT cart.product_id, cart.quantity, products.price
+      `SELECT cart.product_id, cart.quantity, products.price, products.stock
        FROM cart
        JOIN products ON cart.product_id = products.id
        WHERE cart.user_id = ?`,
@@ -32,7 +32,14 @@ router.post('/', async (req, res) => {
       product_id: row[0],
       quantity: row[1],
       price: row[2],
+      stock: row[3],
     }));
+
+    for (const item of cartItems) {
+      if (item.quantity > item.stock) {
+        return res.status(400).json({ error: `Not enough stock for one of the items` });
+      }
+    }
 
     const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
@@ -48,6 +55,10 @@ router.post('/', async (req, res) => {
       db.run(
         'INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)',
         [orderId, item.product_id, item.quantity, item.price]
+      );
+      db.run(
+        'UPDATE products SET stock = stock - ? WHERE id = ?',
+        [item.quantity, item.product_id]
       );
     }
 
