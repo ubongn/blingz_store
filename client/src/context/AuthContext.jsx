@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { apiFetch } from '../api';
+import toast from 'react-hot-toast';
 
 const AuthContext = createContext();
 
@@ -13,6 +14,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const lastNotifCount = useRef(0);
 
   useEffect(() => {
     if (token) {
@@ -55,6 +57,30 @@ export function AuthProvider({ children }) {
     refreshNotifications();
   }, [token, refreshCart, refreshNotifications]);
 
+  useEffect(() => {
+    if (!token) return;
+
+    const interval = setInterval(async () => {
+      const data = await apiFetch('/api/notifications');
+      if (Array.isArray(data)) {
+        const newUnread = data.filter(n => !n.is_read).length;
+        if (lastNotifCount.current > 0 && data.length > lastNotifCount.current) {
+          const newest = data[0];
+          toast(newest.message, { icon: '🔔', duration: 5000 });
+        }
+        setNotifications(data);
+        setUnreadCount(newUnread);
+        lastNotifCount.current = data.length;
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [token]);
+
+  useEffect(() => {
+    lastNotifCount.current = notifications.length;
+  }, [notifications.length]);
+
   function login(newToken) {
     setToken(newToken);
   }
@@ -65,6 +91,7 @@ export function AuthProvider({ children }) {
     setUser(null);
     setNotifications([]);
     setUnreadCount(0);
+    lastNotifCount.current = 0;
   }
 
   const isLoggedIn = !!token;
