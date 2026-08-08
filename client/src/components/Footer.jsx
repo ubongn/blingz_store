@@ -39,7 +39,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-gray-800 mt-8 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-sm">© 2026 BlingzStore. All rights reserved.</p>
+          <p className="text-sm">© {new Date().getFullYear()} BlingzStore. All rights reserved.</p>
           <div className="flex gap-4">
             <a href="#" className="text-gray-400 hover:text-white no-underline text-sm">Facebook</a>
             <a href="#" className="text-gray-400 hover:text-white no-underline text-sm">Twitter</a>

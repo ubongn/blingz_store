@@ -62,7 +62,7 @@ npm install
 ```bash
 # Terminal 1 — Backend (port 5000)
 cd server
-node index.js
+npm run dev
 
 # Terminal 2 — Frontend (port 3000)
 cd client
