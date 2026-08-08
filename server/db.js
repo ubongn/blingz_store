@@ -109,6 +109,40 @@ async function getDb() {
     )
   `);
 
+  try { db.run("ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0"); } catch(e) {}
+  try { db.run("ALTER TABLE orders ADD COLUMN payment_status TEXT DEFAULT 'pending'"); } catch(e) {}
+  try { db.run("ALTER TABLE orders ADD COLUMN payment_method TEXT DEFAULT ''"); } catch(e) {}
+  try { db.run("ALTER TABLE orders ADD COLUMN stripe_payment_intent_id TEXT DEFAULT ''"); } catch(e) {}
+  try { db.run("ALTER TABLE orders ADD COLUMN coupon_code TEXT DEFAULT ''"); } catch(e) {}
+  try { db.run("ALTER TABLE orders ADD COLUMN discount_amount REAL DEFAULT 0"); } catch(e) {}
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      message TEXT NOT NULL,
+      type TEXT DEFAULT 'info',
+      is_read INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS coupons (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT UNIQUE NOT NULL,
+      discount_type TEXT NOT NULL,
+      discount_value REAL NOT NULL,
+      min_order_amount REAL DEFAULT 0,
+      max_uses INTEGER DEFAULT 0,
+      used_count INTEGER DEFAULT 0,
+      expires_at TEXT,
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
   saveDb();
   return db;
 }
