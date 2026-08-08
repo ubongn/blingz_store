@@ -30,6 +30,7 @@ export default function Home() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [featured, setFeatured] = useState([]);
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -64,10 +65,6 @@ export default function Home() {
 
   function handleCategoryClick(cat) {
     setSelectedCategory(selectedCategory === cat ? '' : cat);
-    setPage(1);
-  }
-
-  function handlePriceFilter() {
     setPage(1);
   }
 
@@ -139,69 +136,109 @@ export default function Home() {
           {selectedCategory ? selectedCategory : search ? 'Search Results' : 'Browse Our Collection'}
         </h2>
 
-        {/* Search */}
-        <form onSubmit={handleSearch} className="max-w-md mx-auto mb-6">
-          <div className="flex gap-2">
+        {/* Search + Filter Toggle */}
+        <div className="max-w-xl mx-auto mb-6 flex gap-2">
+          <form onSubmit={handleSearch} className="flex-1 flex gap-2">
             <input
               type="text"
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               placeholder="Search products..."
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
+              className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
             />
-            <button type="submit" className="bg-gray-900 text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-700 cursor-pointer border-none">
+            <button type="submit" className="bg-gray-900 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-gray-700 cursor-pointer border-none">
               Search
             </button>
-          </div>
-        </form>
-
-        {/* Sort + Price Filter */}
-        <div className="flex flex-wrap items-center justify-center gap-4 mb-8">
-          <select
-            value={sort}
-            onChange={(e) => { setSort(e.target.value); setPage(1); }}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
+          </form>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center gap-2 px-4 py-2.5 border rounded-lg text-sm font-medium cursor-pointer transition-colors ${
+              showFilters || hasActiveFilters
+                ? 'bg-gray-900 text-white border-gray-900'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            }`}
           >
-            {SORT_OPTIONS.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            </svg>
+            Filters
+          </button>
+        </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              value={minPrice}
-              onChange={(e) => setMinPrice(e.target.value)}
-              placeholder="Min ₦"
-              min="0"
-              className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-            />
-            <span className="text-gray-400">—</span>
-            <input
-              type="number"
-              value={maxPrice}
-              onChange={(e) => setMaxPrice(e.target.value)}
-              placeholder="Max ₦"
-              min="0"
-              className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-            />
-            <button
-              onClick={handlePriceFilter}
-              className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-700 cursor-pointer border-none"
-            >
-              Filter
-            </button>
-          </div>
-
-          {hasActiveFilters && (
-            <button
-              onClick={clearFilters}
-              className="text-sm text-gray-500 hover:text-gray-900 bg-transparent border-none cursor-pointer underline"
-            >
+        {/* Active Filter Chips */}
+        {hasActiveFilters && (
+          <div className="max-w-xl mx-auto mb-6 flex flex-wrap items-center gap-2">
+            {selectedCategory && (
+              <span className="inline-flex items-center gap-1 px-3 py-1 bg-gray-900 text-white text-sm rounded-full">
+                {selectedCategory}
+                <button onClick={() => { setSelectedCategory(''); setPage(1); }} className="ml-1 text-white hover:text-gray-300 bg-transparent border-none cursor-pointer p-0 text-sm">&times;</button>
+              </span>
+            )}
+            {sort && (
+              <span className="inline-flex items-center gap-1 px-3 py-1 bg-gray-900 text-white text-sm rounded-full">
+                {SORT_OPTIONS.find(o => o.value === sort)?.label}
+                <button onClick={() => { setSort(''); setPage(1); }} className="ml-1 text-white hover:text-gray-300 bg-transparent border-none cursor-pointer p-0 text-sm">&times;</button>
+              </span>
+            )}
+            {minPrice && (
+              <span className="inline-flex items-center gap-1 px-3 py-1 bg-gray-900 text-white text-sm rounded-full">
+                Min ₦{minPrice}
+                <button onClick={() => { setMinPrice(''); setPage(1); }} className="ml-1 text-white hover:text-gray-300 bg-transparent border-none cursor-pointer p-0 text-sm">&times;</button>
+              </span>
+            )}
+            {maxPrice && (
+              <span className="inline-flex items-center gap-1 px-3 py-1 bg-gray-900 text-white text-sm rounded-full">
+                Max ₦{maxPrice}
+                <button onClick={() => { setMaxPrice(''); setPage(1); }} className="ml-1 text-white hover:text-gray-300 bg-transparent border-none cursor-pointer p-0 text-sm">&times;</button>
+              </span>
+            )}
+            <button onClick={clearFilters} className="text-sm text-gray-500 hover:text-gray-900 bg-transparent border-none cursor-pointer underline ml-1">
               Clear all
             </button>
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* Collapsible Filter Panel */}
+        {showFilters && (
+          <div className="max-w-xl mx-auto mb-8 bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Sort by</label>
+                <select
+                  value={sort}
+                  onChange={(e) => { setSort(e.target.value); setPage(1); }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
+                >
+                  {SORT_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Price Range (₦)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={minPrice}
+                    onChange={(e) => setMinPrice(e.target.value)}
+                    placeholder="Min"
+                    min="0"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  />
+                  <span className="text-gray-400">—</span>
+                  <input
+                    type="number"
+                    value={maxPrice}
+                    onChange={(e) => setMaxPrice(e.target.value)}
+                    placeholder="Max"
+                    min="0"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
