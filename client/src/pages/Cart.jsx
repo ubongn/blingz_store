@@ -31,6 +31,7 @@ export default function Cart() {
       toast.error(res.error);
     } else {
       toast.success('Removed from cart');
+      if (res.cartCount !== undefined) setCartCount(res.cartCount);
       loadCart();
     }
   }

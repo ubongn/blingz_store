@@ -1,10 +1,11 @@
 import { useAuth } from '../context/AuthContext';
-import { Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { apiFetch } from '../api';
 
 export default function ProductCard({ product }) {
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, setCartCount } = useAuth();
+  const navigate = useNavigate();
 
   async function handleAddToCart() {
     if (!isLoggedIn) {
@@ -22,6 +23,7 @@ export default function ProductCard({ product }) {
       toast.error(res.error);
     } else {
       toast.success('Added to cart');
+      if (res.cartCount !== undefined) setCartCount(res.cartCount);
     }
   }
 

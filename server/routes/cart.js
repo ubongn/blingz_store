@@ -67,7 +67,11 @@ router.post('/', async (req, res) => {
     }
 
     saveDb();
-    res.status(201).json({ message: 'Item added to cart' });
+
+    const countResult = db.exec('SELECT COUNT(*) FROM cart WHERE user_id = ?', [req.userId]);
+    const cartCount = countResult.length > 0 ? countResult[0].values[0][0] : 0;
+
+    res.status(201).json({ message: 'Item added to cart', cartCount });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -87,7 +91,11 @@ router.delete('/:itemId', async (req, res) => {
 
     db.run('DELETE FROM cart WHERE id = ?', [req.params.itemId]);
     saveDb();
-    res.json({ message: 'Item removed from cart' });
+
+    const countResult = db.exec('SELECT COUNT(*) FROM cart WHERE user_id = ?', [req.userId]);
+    const cartCount = countResult.length > 0 ? countResult[0].values[0][0] : 0;
+
+    res.json({ message: 'Item removed from cart', cartCount });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
