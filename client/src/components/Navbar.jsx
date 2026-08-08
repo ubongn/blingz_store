@@ -26,6 +26,9 @@ export default function Navbar() {
 
           {isLoggedIn ? (
             <>
+              <Link to="/wishlist" className="text-gray-600 hover:text-gray-900 no-underline text-sm font-medium">
+                Wishlist
+              </Link>
               <Link to="/cart" className="text-gray-600 hover:text-gray-900 no-underline text-sm font-medium relative">
                 Cart
                 {cartCount > 0 && (
@@ -33,6 +36,12 @@ export default function Navbar() {
                     {cartCount}
                   </span>
                 )}
+              </Link>
+              <Link to="/orders" className="text-gray-600 hover:text-gray-900 no-underline text-sm font-medium">
+                Orders
+              </Link>
+              <Link to="/profile" className="text-gray-600 hover:text-gray-900 no-underline text-sm font-medium">
+                Profile
               </Link>
               <button
                 onClick={handleLogout}

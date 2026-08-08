@@ -10,12 +10,17 @@ export function useAuth() {
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [cartCount, setCartCount] = useState(0);
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
     if (token) {
       localStorage.setItem('token', token);
+      apiFetch('/api/profile').then(data => {
+        if (data && !data.error) setUser(data);
+      });
     } else {
       localStorage.removeItem('token');
+      setUser(null);
     }
   }, [token]);
 
@@ -41,12 +46,13 @@ export function AuthProvider({ children }) {
   function logout() {
     setToken(null);
     setCartCount(0);
+    setUser(null);
   }
 
   const isLoggedIn = !!token;
 
   return (
-    <AuthContext.Provider value={{ token, isLoggedIn, login, logout, cartCount, setCartCount, refreshCart }}>
+    <AuthContext.Provider value={{ token, isLoggedIn, login, logout, cartCount, setCartCount, refreshCart, user, setUser }}>
       {children}
     </AuthContext.Provider>
   );
