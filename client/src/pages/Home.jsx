@@ -4,17 +4,17 @@ import { apiFetch } from '../api';
 import ProductCard from '../components/ProductCard';
 
 const categories = [
-  { name: 'Electronics', emoji: '📱' },
-  { name: 'Fashion', emoji: '👟' },
-  { name: 'Home', emoji: '🏠' },
-  { name: 'Sports', emoji: '⚽' },
-  { name: 'Accessories', emoji: '⌚' },
+  { name: 'Hair', emoji: '💇‍♀️' },
+  { name: 'Honey', emoji: '🍯' },
+  { name: 'Plantain Chips', emoji: '🍌' },
+  { name: 'Oils & Care', emoji: '🧴' },
+  { name: 'Bundles', emoji: '📦' },
 ];
 
 const testimonials = [
-  { name: 'Amina Bello', quote: 'Absolutely love the quality! My headphones arrived fast and work perfectly. Will definitely shop here again.', stars: 5 },
-  { name: 'Chukwuemeka O.', quote: 'BlingzStore has the best prices I\'ve found. The running shoes are super comfortable. Highly recommended!', stars: 5 },
-  { name: 'Fatima Abubakar', quote: 'Great experience from start to finish. The customer service team was very helpful. Five stars all the way!', stars: 4 },
+  { name: 'Adaeze Nwosu', quote: 'The braided wig I ordered is absolutely gorgeous! It looks so natural and the quality is top notch. BlingzStore is my go-to for hair now.', stars: 5 },
+  { name: 'Blessing Okonkwo', quote: 'The plantain chips are so addictive! My kids finished the spicy pack in one sitting. Already ordering again. Best chips I\'ve tasted in a long time.', stars: 5 },
+  { name: 'Halima Bello', quote: 'I love the raw honey — it\'s so pure and sweet. I use it for my tea and skincare. The coconut oil is also amazing for my hair. Highly recommend!', stars: 5 },
 ];
 
 export default function Home() {
