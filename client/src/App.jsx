@@ -12,6 +12,7 @@ import Wishlist from './pages/Wishlist';
 import Profile from './pages/Profile';
 import OrderHistory from './pages/OrderHistory';
 import OrderDetail from './pages/OrderDetail';
+import AdminCoupons from './pages/AdminCoupons';
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/orders" element={<OrderHistory />} />
           <Route path="/orders/:id" element={<OrderDetail />} />
+          <Route path="/admin/coupons" element={<AdminCoupons />} />
         </Routes>
       </div>
       <Footer />
