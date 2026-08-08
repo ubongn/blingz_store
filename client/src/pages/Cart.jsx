@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../api';
 import toast from 'react-hot-toast';
+import { CartSkeleton } from '../components/Skeleton';
 
 export default function Cart() {
   const [items, setItems] = useState([]);
@@ -54,7 +55,7 @@ export default function Cart() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-gray-500">Loading cart...</p>
+        <CartSkeleton />
       </div>
     );
   }

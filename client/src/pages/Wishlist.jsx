@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../api';
 import toast from 'react-hot-toast';
+import { CartSkeleton } from '../components/Skeleton';
 
 export default function Wishlist() {
   const [items, setItems] = useState([]);
@@ -42,7 +43,7 @@ export default function Wishlist() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-gray-500">Loading wishlist...</p>
+        <CartSkeleton />
       </div>
     );
   }

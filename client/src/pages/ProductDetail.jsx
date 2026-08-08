@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../api';
 import toast from 'react-hot-toast';
+import { ProductDetailSkeleton } from '../components/Skeleton';
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -74,7 +75,7 @@ export default function ProductDetail() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-gray-500">Loading product...</p>
+        <ProductDetailSkeleton />
       </div>
     );
   }
