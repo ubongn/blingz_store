@@ -11,6 +11,8 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [cartCount, setCartCount] = useState(0);
   const [user, setUser] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     if (token) {
@@ -35,9 +37,23 @@ export function AuthProvider({ children }) {
     }
   }, [token]);
 
+  const refreshNotifications = useCallback(async () => {
+    if (!token) {
+      setNotifications([]);
+      setUnreadCount(0);
+      return;
+    }
+    const data = await apiFetch('/api/notifications');
+    if (Array.isArray(data)) {
+      setNotifications(data);
+      setUnreadCount(data.filter(n => !n.is_read).length);
+    }
+  }, [token]);
+
   useEffect(() => {
     refreshCart();
-  }, [token, refreshCart]);
+    refreshNotifications();
+  }, [token, refreshCart, refreshNotifications]);
 
   function login(newToken) {
     setToken(newToken);
@@ -47,12 +63,19 @@ export function AuthProvider({ children }) {
     setToken(null);
     setCartCount(0);
     setUser(null);
+    setNotifications([]);
+    setUnreadCount(0);
   }
 
   const isLoggedIn = !!token;
 
   return (
-    <AuthContext.Provider value={{ token, isLoggedIn, login, logout, cartCount, setCartCount, refreshCart, user, setUser }}>
+    <AuthContext.Provider value={{
+      token, isLoggedIn, login, logout,
+      cartCount, setCartCount, refreshCart,
+      user, setUser,
+      notifications, unreadCount, setUnreadCount, refreshNotifications
+    }}>
       {children}
     </AuthContext.Provider>
   );

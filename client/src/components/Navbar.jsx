@@ -1,18 +1,24 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { apiFetch } from '../api';
 import toast from 'react-hot-toast';
 
 export default function Navbar() {
-  const { isLoggedIn, cartCount, logout, user } = useAuth();
+  const { isLoggedIn, cartCount, logout, user, notifications, unreadCount, setUnreadCount, refreshNotifications } = useAuth();
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const notifRef = useRef(null);
 
   useEffect(() => {
     function handleClickOutside(e) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setDropdownOpen(false);
+      }
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setNotifOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -24,6 +30,18 @@ export default function Navbar() {
     setDropdownOpen(false);
     toast.success('Logged out');
     navigate('/');
+  }
+
+  async function markAsRead(id) {
+    await apiFetch(`/api/notifications/${id}/read`, { method: 'PUT' });
+    setUnreadCount(prev => Math.max(0, prev - 1));
+    refreshNotifications();
+  }
+
+  async function markAllRead() {
+    await apiFetch('/api/notifications/read-all', { method: 'PUT' });
+    setUnreadCount(0);
+    refreshNotifications();
   }
 
   function getInitials(name) {
@@ -47,6 +65,11 @@ export default function Navbar() {
 
           {isLoggedIn ? (
             <>
+              {user?.is_admin === 1 && (
+                <Link to="/admin/coupons" className="text-gray-600 hover:text-gray-900 no-underline text-sm font-medium">
+                  Admin
+                </Link>
+              )}
               <Link to="/wishlist" className="text-gray-600 hover:text-gray-900 no-underline text-sm font-medium">
                 Wishlist
               </Link>
@@ -61,6 +84,51 @@ export default function Navbar() {
               <Link to="/orders" className="text-gray-600 hover:text-gray-900 no-underline text-sm font-medium">
                 Orders
               </Link>
+
+              <div className="relative" ref={notifRef}>
+                <button
+                  onClick={() => setNotifOpen(!notifOpen)}
+                  className="relative bg-transparent border-none cursor-pointer p-1"
+                >
+                  <svg className="w-6 h-6 text-gray-600 hover:text-gray-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {notifOpen && (
+                  <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                      <p className="font-medium text-gray-900 text-sm">Notifications</p>
+                      {unreadCount > 0 && (
+                        <button onClick={markAllRead} className="text-xs text-gray-500 hover:text-gray-900 bg-transparent border-none cursor-pointer">
+                          Mark all read
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-80 overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <p className="px-4 py-6 text-center text-sm text-gray-400">No notifications</p>
+                      ) : (
+                        notifications.slice(0, 10).map(notif => (
+                          <div
+                            key={notif.id}
+                            onClick={() => !notif.is_read && markAsRead(notif.id)}
+                            className={`px-4 py-3 border-b border-gray-50 cursor-pointer hover:bg-gray-50 ${!notif.is_read ? 'bg-blue-50' : ''}`}
+                          >
+                            <p className="text-sm text-gray-700">{notif.message}</p>
+                            <p className="text-xs text-gray-400 mt-1">{new Date(notif.created_at).toLocaleString()}</p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <div className="relative" ref={dropdownRef}>
                 <button
