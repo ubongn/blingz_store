@@ -2,8 +2,15 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { apiFetch } from '../api';
 import ProductCard from '../components/ProductCard';
+import { ProductCardSkeleton } from '../components/Skeleton';
 
 const CATEGORIES = ['Hair', 'Honey', 'Plantain Chips', 'Oils & Care'];
+const SORT_OPTIONS = [
+  { value: '', label: 'Default' },
+  { value: 'price_asc', label: 'Price: Low to High' },
+  { value: 'price_desc', label: 'Price: High to Low' },
+  { value: 'newest', label: 'Newest' },
+];
 
 const testimonials = [
   { name: 'Adaeze Nwosu', quote: 'The braided wig I ordered is absolutely gorgeous! It looks so natural and the quality is top notch. BlingzStore is my go-to for hair now.', stars: 5 },
@@ -17,6 +24,9 @@ export default function Home() {
   const [email, setEmail] = useState('');
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [sort, setSort] = useState('');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [featured, setFeatured] = useState([]);
@@ -26,6 +36,9 @@ export default function Home() {
     const params = new URLSearchParams();
     if (search) params.set('search', search);
     if (selectedCategory) params.set('category', selectedCategory);
+    if (sort) params.set('sort', sort);
+    if (minPrice) params.set('min_price', minPrice);
+    if (maxPrice) params.set('max_price', maxPrice);
     params.set('page', page);
     params.set('limit', 6);
 
@@ -36,7 +49,7 @@ export default function Home() {
       }
       setLoading(false);
     });
-  }, [search, selectedCategory, page]);
+  }, [search, selectedCategory, sort, minPrice, maxPrice, page]);
 
   useEffect(() => {
     apiFetch('/products?limit=4').then(data => {
@@ -54,10 +67,25 @@ export default function Home() {
     setPage(1);
   }
 
+  function handlePriceFilter() {
+    setPage(1);
+  }
+
+  function clearFilters() {
+    setSearch('');
+    setSelectedCategory('');
+    setSort('');
+    setMinPrice('');
+    setMaxPrice('');
+    setPage(1);
+  }
+
   function handleNewsletter(e) {
     e.preventDefault();
     setEmail('');
   }
+
+  const hasActiveFilters = search || selectedCategory || sort || minPrice || maxPrice;
 
   return (
     <div>
@@ -93,7 +121,7 @@ export default function Home() {
       </section>
 
       {/* Featured Products */}
-      {!search && !selectedCategory && (
+      {!search && !selectedCategory && !sort && !minPrice && !maxPrice && (
         <section className="max-w-6xl mx-auto px-4 py-12">
           <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">Our Best Sellers</h2>
           <p className="text-gray-500 mb-8 text-center">Top picks loved by our customers</p>
@@ -111,7 +139,8 @@ export default function Home() {
           {selectedCategory ? selectedCategory : search ? 'Search Results' : 'Browse Our Collection'}
         </h2>
 
-        <form onSubmit={handleSearch} className="max-w-md mx-auto mb-8">
+        {/* Search */}
+        <form onSubmit={handleSearch} className="max-w-md mx-auto mb-6">
           <div className="flex gap-2">
             <input
               type="text"
@@ -126,13 +155,66 @@ export default function Home() {
           </div>
         </form>
 
+        {/* Sort + Price Filter */}
+        <div className="flex flex-wrap items-center justify-center gap-4 mb-8">
+          <select
+            value={sort}
+            onChange={(e) => { setSort(e.target.value); setPage(1); }}
+            className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
+          >
+            {SORT_OPTIONS.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              value={minPrice}
+              onChange={(e) => setMinPrice(e.target.value)}
+              placeholder="Min ₦"
+              min="0"
+              className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+            />
+            <span className="text-gray-400">—</span>
+            <input
+              type="number"
+              value={maxPrice}
+              onChange={(e) => setMaxPrice(e.target.value)}
+              placeholder="Max ₦"
+              min="0"
+              className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+            />
+            <button
+              onClick={handlePriceFilter}
+              className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-700 cursor-pointer border-none"
+            >
+              Filter
+            </button>
+          </div>
+
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="text-sm text-gray-500 hover:text-gray-900 bg-transparent border-none cursor-pointer underline"
+            >
+              Clear all
+            </button>
+          )}
+        </div>
+
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <p className="text-gray-500">Loading products...</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 6 }).map((_, i) => <ProductCardSkeleton key={i} />)}
           </div>
         ) : products.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-gray-500">No products found</p>
+            {hasActiveFilters && (
+              <button onClick={clearFilters} className="mt-2 text-gray-900 underline bg-transparent border-none cursor-pointer">
+                Clear filters
+              </button>
+            )}
           </div>
         ) : (
           <>

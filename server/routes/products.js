@@ -7,7 +7,7 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const db = await getDb();
-    const { search, category, page = 1, limit = 12 } = req.query;
+    const { search, category, page = 1, limit = 12, sort, min_price, max_price } = req.query;
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
     const offset = (pageNum - 1) * limitNum;
@@ -25,7 +25,23 @@ router.get('/', async (req, res) => {
       params.push(category);
     }
 
+    if (min_price) {
+      where.push('p.price >= ?');
+      params.push(parseFloat(min_price));
+    }
+
+    if (max_price) {
+      where.push('p.price <= ?');
+      params.push(parseFloat(max_price));
+    }
+
     const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
+
+    let orderBy = 'p.id ASC';
+    if (sort === 'price_asc') orderBy = 'p.price ASC';
+    else if (sort === 'price_desc') orderBy = 'p.price DESC';
+    else if (sort === 'newest') orderBy = 'p.id DESC';
+    else if (sort === 'oldest') orderBy = 'p.id ASC';
 
     const countResult = db.exec(`SELECT COUNT(*) FROM products p ${whereClause}`, params);
     const total = countResult.length > 0 ? countResult[0].values[0][0] : 0;
@@ -34,7 +50,7 @@ router.get('/', async (req, res) => {
     const result = db.exec(
       `SELECT p.id, p.name, p.description, p.price, p.image_url, p.category, p.stock
        FROM products p ${whereClause}
-       ORDER BY p.id ASC
+       ORDER BY ${orderBy}
        LIMIT ? OFFSET ?`,
       [...params, limitNum, offset]
     );
@@ -139,6 +155,24 @@ router.post('/:id/reviews', auth, async (req, res) => {
         'INSERT INTO reviews (user_id, product_id, rating, comment) VALUES (?, ?, ?, ?)',
         [req.userId, productId, rating, comment || '']
       );
+    }
+
+    const userResult = db.exec('SELECT full_name, email FROM users WHERE id = ?', [req.userId]);
+    const reviewerName = userResult.length > 0 && userResult[0].values.length > 0
+      ? (userResult[0].values[0][0] || userResult[0].values[0][1])
+      : 'Someone';
+
+    const prodResult = db.exec('SELECT name FROM products WHERE id = ?', [productId]);
+    const prodName = prodResult.length > 0 && prodResult[0].values.length > 0 ? prodResult[0].values[0][0] : 'a product';
+
+    const adminResult = db.exec('SELECT id FROM users WHERE is_admin = 1');
+    if (adminResult.length > 0) {
+      adminResult[0].values.forEach(row => {
+        db.run(
+          'INSERT INTO notifications (user_id, message, type) VALUES (?, ?, ?)',
+          [row[0], `${reviewerName} left a ${rating}-star review on ${prodName}`, 'review']
+        );
+      });
     }
 
     saveDb();
