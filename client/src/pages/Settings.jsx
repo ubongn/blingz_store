@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../api';
 import toast from 'react-hot-toast';
+import PasswordInput from '../components/PasswordInput';
 
 export default function Settings() {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -81,8 +82,7 @@ export default function Settings() {
         <form onSubmit={handleChangePassword} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
-            <input
-              type="password"
+            <PasswordInput
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               required
@@ -91,8 +91,7 @@ export default function Settings() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-            <input
-              type="password"
+            <PasswordInput
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               required
@@ -102,8 +101,7 @@ export default function Settings() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
-            <input
-              type="password"
+            <PasswordInput
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
@@ -143,8 +141,7 @@ export default function Settings() {
                 <p className="text-sm text-gray-600 mb-4">
                   This action is irreversible. Enter your password to confirm.
                 </p>
-                <input
-                  type="password"
+                <PasswordInput
                   value={deletePassword}
                   onChange={(e) => setDeletePassword(e.target.value)}
                   placeholder="Enter your password"

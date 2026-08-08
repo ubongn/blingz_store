@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { FiCheck } from 'react-icons/fi';
 import { apiFetch } from '../api';
 import toast from 'react-hot-toast';
 
@@ -37,7 +38,7 @@ export default function ForgotPassword() {
 
         {sent ? (
           <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
-            <div className="text-4xl mb-3">✓</div>
+            <div className="mb-3"><FiCheck className="w-8 h-8 text-green-600 mx-auto" /></div>
             <p className="text-gray-700 mb-2">Reset link sent to <strong>{email}</strong></p>
             {token && (
               <div className="bg-gray-50 rounded-lg p-3 mb-4">

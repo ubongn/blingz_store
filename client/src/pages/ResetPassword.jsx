@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
+import { FiCheck } from 'react-icons/fi';
 import { apiFetch } from '../api';
 import toast from 'react-hot-toast';
+import PasswordInput from '../components/PasswordInput';
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -58,7 +60,7 @@ export default function ResetPassword() {
     return (
       <div className="min-h-[60vh] flex items-center justify-center px-4">
         <div className="w-full max-w-md bg-white rounded-xl border border-gray-200 p-6 text-center">
-          <div className="text-4xl mb-3">✓</div>
+          <div className="mb-3"><FiCheck className="w-8 h-8 text-green-600 mx-auto" /></div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Password Reset!</h2>
           <p className="text-gray-500 mb-4">Your password has been updated.</p>
           <button
@@ -81,8 +83,7 @@ export default function ResetPassword() {
         <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-            <input
-              type="password"
+            <PasswordInput
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -92,8 +93,7 @@ export default function ResetPassword() {
           </div>
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
-            <input
-              type="password"
+            <PasswordInput
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required

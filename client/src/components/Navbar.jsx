@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { FiBell, FiChevronDown } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../api';
 import toast from 'react-hot-toast';
@@ -104,9 +105,7 @@ export default function Navbar() {
                   onClick={() => setNotifOpen(!notifOpen)}
                   className="relative bg-transparent border-none cursor-pointer p-1"
                 >
-                  <svg className="w-6 h-6 text-gray-600 hover:text-gray-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                  </svg>
+                  <FiBell className="w-6 h-6" />
                   {unreadCount > 0 && (
                     <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
                       {unreadCount}
@@ -152,14 +151,7 @@ export default function Navbar() {
                   <div className="bg-gray-900 text-white rounded-full w-10 h-10 flex items-center justify-center font-medium text-sm">
                     {getInitials(user?.full_name)}
                   </div>
-                  <svg
-                    className={`w-4 h-4 text-gray-500 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
+                  <FiChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
 
                 {dropdownOpen && (

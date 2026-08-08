@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../api';
 import toast from 'react-hot-toast';
+import PasswordInput from '../components/PasswordInput';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -56,8 +57,7 @@ export default function Login() {
                 Forgot Password?
               </Link>
             </div>
-            <input
-              type="password"
+            <PasswordInput
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required

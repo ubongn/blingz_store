@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../api';
 import toast from 'react-hot-toast';
 import { ProductDetailSkeleton } from '../components/Skeleton';
+import { FiArrowLeft, FiStar } from 'react-icons/fi';
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -101,7 +102,7 @@ export default function ProductDetail() {
       </Helmet>
 
       <Link to="/" className="text-gray-500 text-sm no-underline hover:text-gray-900 mb-6 inline-block">
-        &larr; Back to Products
+        <FiArrowLeft className="inline mr-1" /> Back to Products
       </Link>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -116,7 +117,11 @@ export default function ProductDetail() {
 
             {product.avgRating > 0 && (
               <div className="flex items-center gap-2 mb-4">
-                <span className="text-yellow-400">{'★'.repeat(Math.round(product.avgRating))}</span>
+                <div className="flex">
+                  {[1,2,3,4,5].map(s => (
+                    <FiStar key={s} className={s <= Math.round(product.avgRating) ? 'text-yellow-400 fill-current' : 'text-gray-300'} />
+                  ))}
+                </div>
                 <span className="text-gray-500 text-sm">({product.avgRating}) · {product.reviews?.length || 0} reviews</span>
               </div>
             )}
@@ -155,9 +160,9 @@ export default function ProductDetail() {
                     key={star}
                     type="button"
                     onClick={() => setRating(star)}
-                    className={`text-2xl bg-transparent border-none cursor-pointer ${star <= rating ? 'text-yellow-400' : 'text-gray-300'}`}
+                    className={`bg-transparent border-none cursor-pointer hover:scale-110 transition-transform ${star <= rating ? 'text-yellow-400' : 'text-gray-300'}`}
                   >
-                    ★
+                    <FiStar className={star <= rating ? 'fill-current' : ''} />
                   </button>
                 ))}
               </div>
@@ -187,7 +192,11 @@ export default function ProductDetail() {
             {product.reviews.map((review, i) => (
               <div key={i} className="bg-white rounded-xl border border-gray-200 p-6">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-yellow-400">{'★'.repeat(review.rating)}</span>
+                  <div className="flex">
+                    {[1,2,3,4,5].map(s => (
+                      <FiStar key={s} className={s <= review.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'} />
+                    ))}
+                  </div>
                   <span className="text-gray-400 text-sm">{new Date(review.created_at).toLocaleDateString()}</span>
                 </div>
                 <p className="text-gray-600 mb-2">{review.comment}</p>

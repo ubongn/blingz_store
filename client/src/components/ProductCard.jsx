@@ -1,11 +1,14 @@
+import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { apiFetch } from '../api';
+import { FiHeart } from 'react-icons/fi';
 
 export default function ProductCard({ product }) {
   const { isLoggedIn, setCartCount } = useAuth();
   const navigate = useNavigate();
+  const [inWishlist, setInWishlist] = useState(product.in_wishlist || false);
 
   async function handleAddToCart(e) {
     e.preventDefault();
@@ -45,7 +48,8 @@ export default function ProductCard({ product }) {
       method: 'POST',
       body: JSON.stringify({ product_id: product.id }),
     });
-    toast.success('Added to wishlist');
+    setInWishlist((prev) => !prev);
+    toast.success(inWishlist ? 'Removed from wishlist' : 'Added to wishlist');
   }
 
   return (
@@ -65,9 +69,9 @@ export default function ProductCard({ product }) {
           <h3 className="font-semibold text-gray-900">{product.name}</h3>
           <button
             onClick={handleToggleWishlist}
-            className="text-gray-400 hover:text-red-500 bg-transparent border-none cursor-pointer text-lg shrink-0 ml-2"
+            className={`bg-transparent border-none cursor-pointer shrink-0 ml-2 ${inWishlist ? 'text-red-500' : 'text-gray-400 hover:text-red-500'}`}
           >
-            ♡
+            <FiHeart size={18} fill={inWishlist ? 'currentColor' : 'none'} />
           </button>
         </div>
         <p className="text-gray-500 text-sm mb-1">{product.description}</p>

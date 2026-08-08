@@ -66,7 +66,7 @@ export function AuthProvider({ children }) {
         const newUnread = data.filter(n => !n.is_read).length;
         if (lastNotifCount.current > 0 && data.length > lastNotifCount.current) {
           const newest = data[0];
-          toast(newest.message, { icon: '🔔', duration: 5000 });
+          toast(newest.message, { duration: 5000 });
         }
         setNotifications(data);
         setUnreadCount(newUnread);

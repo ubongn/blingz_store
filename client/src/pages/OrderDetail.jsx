@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { FiArrowLeft, FiCheck } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../api';
 
@@ -45,7 +46,7 @@ export default function OrderDetail() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <Link to="/orders" className="text-gray-500 text-sm no-underline hover:text-gray-900 mb-6 inline-block">
-        &larr; Back to Orders
+        <FiArrowLeft className="inline mr-1" /> Back to Orders
       </Link>
 
       <h2 className="text-2xl font-bold text-gray-900 mb-6">Order #{order.id}</h2>
@@ -59,7 +60,7 @@ export default function OrderDetail() {
               <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${
                 i <= currentStep ? 'bg-gray-900 text-white' : 'bg-gray-200 text-gray-500'
               }`}>
-                {i <= currentStep ? '✓' : i + 1}
+                {i <= currentStep ? <FiCheck className="text-sm" /> : i + 1}
               </div>
               <span className={`text-xs mt-2 font-medium ${i <= currentStep ? 'text-gray-900' : 'text-gray-400'}`}>
                 {step}
