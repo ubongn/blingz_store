@@ -11,6 +11,9 @@ export default function AdminProducts() {
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [form, setForm] = useState({ name: '', description: '', price: '', image_url: '', category: 'Hair', stock: '' });
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState('');
+  const [uploading, setUploading] = useState(false);
   const { isLoggedIn, user } = useAuth();
   const navigate = useNavigate();
 
@@ -39,6 +42,8 @@ export default function AdminProducts() {
   function openCreate() {
     setEditingProduct(null);
     setForm({ name: '', description: '', price: '', image_url: '', category: 'Hair', stock: '' });
+    setImageFile(null);
+    setImagePreview('');
     setShowForm(true);
   }
 
@@ -52,13 +57,43 @@ export default function AdminProducts() {
       category: product.category || 'Hair',
       stock: product.stock.toString(),
     });
+    setImageFile(null);
+    setImagePreview(product.image_url || '');
     setShowForm(true);
+  }
+
+  function handleImageChange(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
+    setUploading(true);
+
+    let imageUrl = form.image_url;
+    if (imageFile) {
+      const fd = new FormData();
+      fd.append('image', imageFile);
+      const uploadRes = await fetch('http://localhost:5000/api/admin/upload', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        body: fd,
+      });
+      const uploadData = await uploadRes.json();
+      if (uploadData.error) {
+        toast.error(uploadData.error);
+        setUploading(false);
+        return;
+      }
+      imageUrl = uploadData.url;
+    }
+
     const body = {
       ...form,
+      image_url: imageUrl,
       price: parseFloat(form.price),
       stock: parseInt(form.stock) || 0,
     };
@@ -75,6 +110,8 @@ export default function AdminProducts() {
         body: JSON.stringify(body),
       });
     }
+
+    setUploading(false);
 
     if (res.error) {
       toast.error(res.error);
@@ -178,15 +215,16 @@ export default function AdminProducts() {
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Image URL</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Product Image</label>
                 <input
-                  type="url"
-                  name="image_url"
-                  value={form.image_url}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
-                  placeholder="https://example.com/image.jpg"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:bg-gray-900 file:text-white file:text-sm file:cursor-pointer"
                 />
+                {imagePreview && (
+                  <img src={imagePreview} alt="Preview" className="mt-2 w-20 h-20 object-cover rounded-lg border border-gray-200" />
+                )}
               </div>
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
@@ -202,9 +240,10 @@ export default function AdminProducts() {
             <div className="flex gap-3">
               <button
                 type="submit"
-                className="bg-gray-900 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-gray-700 cursor-pointer border-none"
+                disabled={uploading}
+                className="bg-gray-900 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-gray-700 disabled:opacity-50 cursor-pointer border-none"
               >
-                {editingProduct ? 'Update' : 'Create'}
+                {uploading ? 'Uploading...' : editingProduct ? 'Update' : 'Create'}
               </button>
               <button
                 type="button"

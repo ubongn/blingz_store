@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../api';
@@ -91,6 +92,14 @@ export default function ProductDetail() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
+      <Helmet>
+        <title>{product.name} - BlingzStore</title>
+        <meta name="description" content={product.description || `${product.name} - Shop at BlingzStore`} />
+        <meta property="og:title" content={`${product.name} - BlingzStore`} />
+        <meta property="og:description" content={product.description || `${product.name} - Shop at BlingzStore`} />
+        <meta property="og:type" content="product" />
+      </Helmet>
+
       <Link to="/" className="text-gray-500 text-sm no-underline hover:text-gray-900 mb-6 inline-block">
         &larr; Back to Products
       </Link>

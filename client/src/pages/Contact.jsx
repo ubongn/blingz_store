@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
+import { Helmet } from 'react-helmet-async';
 
 export default function Contact() {
   const [name, setName] = useState('');
@@ -27,6 +28,10 @@ export default function Contact() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-12">
+      <Helmet>
+        <title>Contact Us - BlingzStore</title>
+        <meta name="description" content="Get in touch with BlingzStore. We are here to help with your orders and inquiries." />
+      </Helmet>
       <h1 className="text-3xl font-bold text-gray-900 mb-2">Contact Us</h1>
       <p className="text-gray-600 mb-8">Have a question or need help? We would love to hear from you.</p>
 

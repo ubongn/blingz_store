@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { apiFetch } from '../api';
 import ProductCard from '../components/ProductCard';
 import { ProductCardSkeleton } from '../components/Skeleton';
@@ -86,6 +87,13 @@ export default function Home() {
 
   return (
     <div>
+      <Helmet>
+        <title>BlingzStore - Quality Hair, Honey & Plantain Chips in Abuja</title>
+        <meta name="description" content="Shop premium braided wigs, organic honey, plantain chips and hair care products at BlingzStore. Fast delivery in Abuja, Nigeria." />
+        <meta property="og:title" content="BlingzStore - Quality Hair, Honey & Plantain Chips" />
+        <meta property="og:description" content="Shop premium braided wigs, organic honey, plantain chips and hair care products." />
+        <meta property="og:type" content="website" />
+      </Helmet>
       {/* Hero Banner */}
       <section className="bg-gradient-to-r from-gray-900 to-gray-700 text-white py-20 px-4">
         <div className="max-w-6xl mx-auto text-center">
@@ -319,7 +327,7 @@ export default function Home() {
               onChange={(e) => setEmail(e.target.value)}
               required
               placeholder="Enter your email"
-              className="flex-1 px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-white"
+              className="flex-1 px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-white text-gray-900 placeholder-gray-500"
             />
             <button type="submit" className="bg-white text-gray-900 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 cursor-pointer border-none">
               Subscribe

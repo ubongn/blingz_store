@@ -1,8 +1,13 @@
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 
 export default function About() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-12">
+      <Helmet>
+        <title>About Us - BlingzStore</title>
+        <meta name="description" content="Learn about BlingzStore - your trusted online shop for quality hair, honey and plantain chips in Abuja, Nigeria." />
+      </Helmet>
       <h1 className="text-3xl font-bold text-gray-900 mb-6">About BlingzStore</h1>
 
       <div className="bg-white rounded-xl border border-gray-200 p-8 mb-8">
