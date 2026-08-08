@@ -1,15 +1,100 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../api';
 import toast from 'react-hot-toast';
 
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+
+function CheckoutForm({ items, total, form, couponCode, discountAmount }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [processing, setProcessing] = useState(false);
+  const navigate = useNavigate();
+  const { refreshCart, refreshNotifications } = useAuth();
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+    setProcessing(true);
+
+    const { error: submitError } = await elements.submit();
+    if (submitError) {
+      toast.error(submitError.message);
+      setProcessing(false);
+      return;
+    }
+
+    const res = await apiFetch('/checkout/create-payment-intent', {
+      method: 'POST',
+      body: JSON.stringify({ amount: total, coupon_code: couponCode || undefined }),
+    });
+
+    if (res.error) {
+      toast.error(res.error);
+      setProcessing(false);
+      return;
+    }
+
+    const { error } = await stripe.confirmPayment({
+      elements,
+      clientSecret: res.clientSecret,
+      redirect: 'if_required',
+    });
+
+    if (error) {
+      toast.error(error.message);
+      setProcessing(false);
+      return;
+    }
+
+    const orderRes = await apiFetch('/checkout', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...form,
+        payment_intent_id: res.paymentIntentId,
+        coupon_code: couponCode || '',
+        discount_amount: discountAmount || 0,
+      }),
+    });
+
+    if (orderRes.error) {
+      toast.error(orderRes.error);
+    } else {
+      toast.success('Order placed!');
+      refreshCart();
+      refreshNotifications();
+      navigate(`/order-confirmation/${orderRes.orderId}`);
+    }
+    setProcessing(false);
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <PaymentElement />
+      <button
+        type="submit"
+        disabled={!stripe || processing}
+        className="w-full bg-gray-900 text-white py-3 rounded-lg font-medium hover:bg-gray-700 disabled:opacity-50 cursor-pointer border-none"
+      >
+        {processing ? 'Processing...' : `Pay ₦${(total - discountAmount).toFixed(2)}`}
+      </button>
+    </form>
+  );
+}
+
 export default function Checkout() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({ full_name: '', address: '', city: '', phone: '' });
-  const { isLoggedIn } = useAuth();
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [clientSecret, setClientSecret] = useState('');
+  const { isLoggedIn, refreshCart } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -31,26 +116,46 @@ export default function Checkout() {
     setForm({ ...form, [e.target.name]: e.target.value });
   }
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setSubmitting(true);
-
-    const res = await apiFetch('/checkout', {
+  async function applyCoupon() {
+    if (!couponCode.trim()) return;
+    setCouponLoading(true);
+    const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const res = await apiFetch('/checkout/validate-coupon', {
       method: 'POST',
-      body: JSON.stringify(form),
+      body: JSON.stringify({ code: couponCode, orderAmount: subtotal }),
     });
-
-    setSubmitting(false);
+    setCouponLoading(false);
 
     if (res.error) {
       toast.error(res.error);
+      setAppliedCoupon(null);
+      setDiscountAmount(0);
     } else {
-      toast.success('Order placed!');
-      navigate(`/order-confirmation/${res.orderId}`);
+      setAppliedCoupon(res);
+      setDiscountAmount(res.discount_amount);
+      toast.success(`Coupon applied! You save ₦${res.discount_amount.toFixed(2)}`);
     }
   }
 
-  const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  function removeCoupon() {
+    setAppliedCoupon(null);
+    setDiscountAmount(0);
+    setCouponCode('');
+  }
+
+  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const finalTotal = subtotal - discountAmount;
+
+  useEffect(() => {
+    if (items.length > 0 && finalTotal > 0) {
+      apiFetch('/checkout/create-payment-intent', {
+        method: 'POST',
+        body: JSON.stringify({ amount: finalTotal }),
+      }).then(data => {
+        if (data.clientSecret) setClientSecret(data.clientSecret);
+      });
+    }
+  }, [items, finalTotal]);
 
   if (loading) {
     return (
@@ -79,17 +184,56 @@ export default function Checkout() {
               </div>
             ))}
           </div>
-          <div className="mt-4 border-t border-gray-200 pt-4">
-            <div className="flex justify-between">
+
+          <div className="mt-4 bg-gray-50 rounded-lg p-3">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Have a coupon?</label>
+            {appliedCoupon ? (
+              <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                <span className="text-sm text-green-700 font-medium">{appliedCoupon.code} — {appliedCoupon.discount_type === 'percentage' ? `${appliedCoupon.discount_value}% off` : `₦${appliedCoupon.discount_value} off`}</span>
+                <button onClick={removeCoupon} className="text-red-500 text-xs hover:underline bg-transparent border-none cursor-pointer">Remove</button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                  placeholder="Enter code"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                />
+                <button
+                  type="button"
+                  onClick={applyCoupon}
+                  disabled={couponLoading}
+                  className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-700 disabled:opacity-50 cursor-pointer border-none"
+                >
+                  {couponLoading ? '...' : 'Apply'}
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-4 border-t border-gray-200 pt-4 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Subtotal</span>
+              <span className="text-gray-900">₦{subtotal.toFixed(2)}</span>
+            </div>
+            {discountAmount > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-green-600">Discount</span>
+                <span className="text-green-600">-₦{discountAmount.toFixed(2)}</span>
+              </div>
+            )}
+            <div className="flex justify-between border-t border-gray-200 pt-2">
               <span className="font-medium text-gray-700">Total</span>
-              <span className="font-bold text-gray-900 text-lg">₦{total.toFixed(2)}</span>
+              <span className="font-bold text-gray-900 text-lg">₦{finalTotal.toFixed(2)}</span>
             </div>
           </div>
         </div>
 
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Shipping Information</h3>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-4 mb-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
               <input
@@ -102,7 +246,6 @@ export default function Checkout() {
                 placeholder="John Doe"
               />
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
               <input
@@ -115,7 +258,6 @@ export default function Checkout() {
                 placeholder="123 Main Street"
               />
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
               <input
@@ -128,7 +270,6 @@ export default function Checkout() {
                 placeholder="Lagos"
               />
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
               <input
@@ -141,15 +282,16 @@ export default function Checkout() {
                 placeholder="08012345678"
               />
             </div>
+          </div>
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full bg-gray-900 text-white py-3 rounded-lg font-medium hover:bg-gray-700 disabled:opacity-50 cursor-pointer border-none"
-            >
-              {submitting ? 'Placing Order...' : 'Place Order'}
-            </button>
-          </form>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment</h3>
+          {clientSecret ? (
+            <Elements stripe={stripePromise} options={{ clientSecret }}>
+              <CheckoutForm items={items} total={finalTotal} form={form} couponCode={couponCode} discountAmount={discountAmount} />
+            </Elements>
+          ) : (
+            <p className="text-gray-500 text-sm">Loading payment...</p>
+          )}
         </div>
       </div>
     </div>

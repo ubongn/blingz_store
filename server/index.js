@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
@@ -7,7 +8,10 @@ const cartRoutes = require('./routes/cart');
 const checkoutRoutes = require('./routes/checkout');
 const wishlistRoutes = require('./routes/wishlist');
 const orderRoutes = require('./routes/orders');
+const notificationRoutes = require('./routes/notifications');
+const adminRoutes = require('./routes/admin');
 const { getDb, saveDb } = require('./db');
+const bcrypt = require('bcrypt');
 
 const app = express();
 const port = 5000;
@@ -21,6 +25,8 @@ app.use('/cart', cartRoutes);
 app.use('/checkout', checkoutRoutes);
 app.use('/wishlist', wishlistRoutes);
 app.use('/orders', orderRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.get('/test', (req, res) => {
   res.json({ message: 'Server is running' });
@@ -58,9 +64,21 @@ async function seedProducts() {
   }
 }
 
+async function seedAdmin() {
+  const db = await getDb();
+  const result = db.exec("SELECT id FROM users WHERE email = 'admin@blingzstore.com'");
+  if (result.length === 0 || result[0].values.length === 0) {
+    const hash = await bcrypt.hash('admin123', 10);
+    db.run("INSERT INTO users (email, password, full_name, is_admin) VALUES (?, ?, ?, 1)", ['admin@blingzstore.com', hash, 'Admin']);
+    saveDb();
+    console.log('Seeded admin user: admin@blingzstore.com / admin123');
+  }
+}
+
 async function start() {
   await getDb();
   await seedProducts();
+  await seedAdmin();
   app.listen(port, '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${port}`);
   });

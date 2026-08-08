@@ -83,7 +83,31 @@ export default function OrderDetail() {
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h3 className="font-semibold text-gray-900 mb-3">Order Items</h3>
+          <h3 className="font-semibold text-gray-900 mb-3">Payment & Items</h3>
+          <div className="space-y-2 text-sm mb-4">
+            <div className="flex justify-between">
+              <span className="text-gray-500">Payment:</span>
+              <span className={`font-medium ${order.payment_status === 'paid' ? 'text-green-600' : 'text-yellow-600'}`}>
+                {order.payment_status === 'paid' ? 'Paid' : 'Pending'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Method:</span>
+              <span className="font-medium text-gray-900 capitalize">{order.payment_method || 'N/A'}</span>
+            </div>
+            {order.coupon_code && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Coupon:</span>
+                <span className="font-medium text-green-600">{order.coupon_code}</span>
+              </div>
+            )}
+            {order.discount_amount > 0 && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Discount:</span>
+                <span className="font-medium text-green-600">-₦{order.discount_amount.toFixed(2)}</span>
+              </div>
+            )}
+          </div>
           <div className="space-y-3">
             {order.items?.map((item, i) => (
               <div key={i} className="flex items-center gap-3">
