@@ -16,6 +16,7 @@ import AdminCoupons from './pages/AdminCoupons';
 import AdminProducts from './pages/AdminProducts';
 import AdminOrders from './pages/AdminOrders';
 import AdminUsers from './pages/AdminUsers';
+import Settings from './pages/Settings';
 
 function App() {
   return (
@@ -32,6 +33,7 @@ function App() {
           <Route path="/order-confirmation/:id" element={<OrderConfirmation />} />
           <Route path="/wishlist" element={<Wishlist />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/settings" element={<Settings />} />
           <Route path="/orders" element={<OrderHistory />} />
           <Route path="/orders/:id" element={<OrderDetail />} />
           <Route path="/admin/products" element={<AdminProducts />} />

@@ -176,19 +176,30 @@ export default function Navbar() {
                       >
                         My Profile
                       </Link>
+                      {!user?.is_admin && (
+                        <>
+                          <Link
+                            to="/orders"
+                            onClick={() => setDropdownOpen(false)}
+                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 no-underline"
+                          >
+                            My Orders
+                          </Link>
+                          <Link
+                            to="/wishlist"
+                            onClick={() => setDropdownOpen(false)}
+                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 no-underline"
+                          >
+                            My Wishlist
+                          </Link>
+                        </>
+                      )}
                       <Link
-                        to="/orders"
+                        to="/settings"
                         onClick={() => setDropdownOpen(false)}
                         className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 no-underline"
                       >
-                        My Orders
-                      </Link>
-                      <Link
-                        to="/wishlist"
-                        onClick={() => setDropdownOpen(false)}
-                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 no-underline"
-                      >
-                        My Wishlist
+                        Account Settings
                       </Link>
                     </div>
                     <div className="border-t border-gray-100 py-1">

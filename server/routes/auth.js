@@ -105,4 +105,79 @@ router.put('/profile', auth, async (req, res) => {
   }
 });
 
+router.put('/change-password', auth, async (req, res) => {
+  try {
+    const { current_password, new_password } = req.body;
+
+    if (!current_password || !new_password) {
+      return res.status(400).json({ error: 'Current and new password are required' });
+    }
+
+    if (new_password.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    }
+
+    const db = await getDb();
+    const result = db.exec('SELECT password FROM users WHERE id = ?', [req.userId]);
+
+    if (result.length === 0 || result[0].values.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const storedHash = result[0].values[0][0];
+    const match = await bcrypt.compare(current_password, storedHash);
+
+    if (!match) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    const hash = await bcrypt.hash(new_password, 10);
+    db.run('UPDATE users SET password = ? WHERE id = ?', [hash, req.userId]);
+    saveDb();
+
+    res.json({ message: 'Password changed' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/account', auth, async (req, res) => {
+  try {
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({ error: 'Password is required' });
+    }
+
+    const db = await getDb();
+    const result = db.exec('SELECT password, is_admin FROM users WHERE id = ?', [req.userId]);
+
+    if (result.length === 0 || result[0].values.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const [storedHash, isAdmin] = result[0].values[0];
+
+    if (isAdmin) {
+      return res.status(403).json({ error: 'Admin accounts cannot be deleted' });
+    }
+
+    const match = await bcrypt.compare(password, storedHash);
+    if (!match) {
+      return res.status(401).json({ error: 'Incorrect password' });
+    }
+
+    db.run('DELETE FROM reviews WHERE user_id = ?', [req.userId]);
+    db.run('DELETE FROM wishlist WHERE user_id = ?', [req.userId]);
+    db.run('DELETE FROM cart WHERE user_id = ?', [req.userId]);
+    db.run('DELETE FROM notifications WHERE user_id = ?', [req.userId]);
+    db.run('DELETE FROM users WHERE id = ?', [req.userId]);
+    saveDb();
+
+    res.json({ message: 'Account deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
