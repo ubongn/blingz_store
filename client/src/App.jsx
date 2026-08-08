@@ -13,6 +13,9 @@ import Profile from './pages/Profile';
 import OrderHistory from './pages/OrderHistory';
 import OrderDetail from './pages/OrderDetail';
 import AdminCoupons from './pages/AdminCoupons';
+import AdminProducts from './pages/AdminProducts';
+import AdminOrders from './pages/AdminOrders';
+import AdminUsers from './pages/AdminUsers';
 
 function App() {
   return (
@@ -31,7 +34,10 @@ function App() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/orders" element={<OrderHistory />} />
           <Route path="/orders/:id" element={<OrderDetail />} />
+          <Route path="/admin/products" element={<AdminProducts />} />
+          <Route path="/admin/orders" element={<AdminOrders />} />
           <Route path="/admin/coupons" element={<AdminCoupons />} />
+          <Route path="/admin/users" element={<AdminUsers />} />
         </Routes>
       </div>
       <Footer />

@@ -65,25 +65,39 @@ export default function Navbar() {
 
           {isLoggedIn ? (
             <>
-              {user?.is_admin === 1 && (
-                <Link to="/admin/coupons" className="text-gray-600 hover:text-gray-900 no-underline text-sm font-medium">
-                  Admin
-                </Link>
+              {user?.is_admin === 1 ? (
+                <>
+                  <Link to="/admin/products" className="text-gray-600 hover:text-gray-900 no-underline text-sm font-medium">
+                    Products
+                  </Link>
+                  <Link to="/admin/orders" className="text-gray-600 hover:text-gray-900 no-underline text-sm font-medium">
+                    Orders
+                  </Link>
+                  <Link to="/admin/coupons" className="text-gray-600 hover:text-gray-900 no-underline text-sm font-medium">
+                    Coupons
+                  </Link>
+                  <Link to="/admin/users" className="text-gray-600 hover:text-gray-900 no-underline text-sm font-medium">
+                    Users
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link to="/wishlist" className="text-gray-600 hover:text-gray-900 no-underline text-sm font-medium">
+                    Wishlist
+                  </Link>
+                  <Link to="/cart" className="text-gray-600 hover:text-gray-900 no-underline text-sm font-medium relative">
+                    Cart
+                    {cartCount > 0 && (
+                      <span className="absolute -top-2 -right-4 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                        {cartCount}
+                      </span>
+                    )}
+                  </Link>
+                  <Link to="/orders" className="text-gray-600 hover:text-gray-900 no-underline text-sm font-medium">
+                    Orders
+                  </Link>
+                </>
               )}
-              <Link to="/wishlist" className="text-gray-600 hover:text-gray-900 no-underline text-sm font-medium">
-                Wishlist
-              </Link>
-              <Link to="/cart" className="text-gray-600 hover:text-gray-900 no-underline text-sm font-medium relative">
-                Cart
-                {cartCount > 0 && (
-                  <span className="absolute -top-2 -right-4 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    {cartCount}
-                  </span>
-                )}
-              </Link>
-              <Link to="/orders" className="text-gray-600 hover:text-gray-900 no-underline text-sm font-medium">
-                Orders
-              </Link>
 
               <div className="relative" ref={notifRef}>
                 <button
