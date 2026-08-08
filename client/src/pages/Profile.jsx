@@ -32,7 +32,7 @@ export default function Profile() {
 
     const res = await apiFetch('/api/profile', {
       method: 'PUT',
-      body: JSON.stringify({ full_name: fullName, email }),
+      body: JSON.stringify({ full_name: fullName }),
     });
 
     setSaving(false);
@@ -74,10 +74,10 @@ export default function Profile() {
           <input
             type="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
+            readOnly
+            className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
           />
+          <p className="text-xs text-gray-400 mt-1">Email cannot be changed</p>
         </div>
 
         <button

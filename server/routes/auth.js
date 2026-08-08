@@ -8,7 +8,7 @@ const router = express.Router();
 
 router.post('/signup', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, full_name } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
@@ -21,7 +21,7 @@ router.post('/signup', async (req, res) => {
     }
 
     const hash = await bcrypt.hash(password, 10);
-    db.run('INSERT INTO users (email, password) VALUES (?, ?)', [email, hash]);
+    db.run('INSERT INTO users (email, password, full_name) VALUES (?, ?, ?)', [email, hash, full_name || '']);
     saveDb();
 
     res.status(201).json({ message: 'Account created' });
@@ -80,18 +80,11 @@ router.get('/profile', auth, async (req, res) => {
 
 router.put('/profile', auth, async (req, res) => {
   try {
-    const { full_name, email } = req.body;
+    const { full_name } = req.body;
     const db = await getDb();
 
-    if (email) {
-      const existing = db.exec('SELECT id FROM users WHERE email = ? AND id != ?', [email, req.userId]);
-      if (existing.length > 0 && existing[0].values.length > 0) {
-        return res.status(409).json({ error: 'Email already in use' });
-      }
-    }
-
-    db.run('UPDATE users SET full_name = ?, email = ? WHERE id = ?',
-      [full_name || '', email || '', req.userId]);
+    db.run('UPDATE users SET full_name = ? WHERE id = ?',
+      [full_name || '', req.userId]);
     saveDb();
 
     res.json({ message: 'Profile updated' });
