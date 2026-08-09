@@ -53,7 +53,7 @@ export default function Navbar() {
   }
 
   return (
-    <nav className="bg-white shadow-sm border-b border-gray-200">
+    <nav className="bg-white shadow-sm border-b border-gray-200" role="navigation" aria-label="Main navigation">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
         <Link to="/" className="text-xl font-bold text-gray-900 no-underline">
           BlingzStore
@@ -66,7 +66,7 @@ export default function Navbar() {
 
           {isLoggedIn ? (
             <>
-              {user?.is_admin === 1 ? (
+              {user?.is_admin ? (
                 <>
                   <Link to="/admin" className="text-gray-600 hover:text-gray-900 no-underline text-sm font-medium">
                     Dashboard
@@ -107,8 +107,11 @@ export default function Navbar() {
                 <button
                   onClick={() => setNotifOpen(!notifOpen)}
                   className="relative bg-transparent border-none cursor-pointer p-1"
+                  aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
+                  aria-expanded={notifOpen}
+                  aria-haspopup="true"
                 >
-                  <FiBell className="w-6 h-6" />
+                  <FiBell className="w-6 h-6" aria-hidden="true" />
                   {unreadCount > 0 && (
                     <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
                       {unreadCount}
@@ -117,7 +120,7 @@ export default function Navbar() {
                 </button>
 
                 {notifOpen && (
-                  <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                  <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50" role="region" aria-label="Notifications panel">
                     <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
                       <p className="font-medium text-gray-900 text-sm">Notifications</p>
                       {unreadCount > 0 && (
@@ -150,6 +153,9 @@ export default function Navbar() {
                 <button
                   onClick={() => setDropdownOpen(!dropdownOpen)}
                   className="flex items-center gap-2 bg-transparent border-none cursor-pointer p-0"
+                  aria-label="User menu"
+                  aria-expanded={dropdownOpen}
+                  aria-haspopup="true"
                 >
                   <div className="bg-gray-900 text-white rounded-full w-10 h-10 flex items-center justify-center font-medium text-sm overflow-hidden">
                     {user?.avatar_url ? (
@@ -162,7 +168,7 @@ export default function Navbar() {
                 </button>
 
                 {dropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                  <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50" role="menu" aria-label="User menu">
                     <div className="px-4 py-3 border-b border-gray-100">
                       <p className="font-medium text-gray-900 text-sm">{user?.full_name || 'User'}</p>
                       <p className="text-xs text-gray-500 truncate">{user?.email}</p>

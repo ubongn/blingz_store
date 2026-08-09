@@ -70,8 +70,10 @@ export default function ProductCard({ product }) {
           <button
             onClick={handleToggleWishlist}
             className={`bg-transparent border-none cursor-pointer shrink-0 ml-2 ${inWishlist ? 'text-red-500' : 'text-gray-400 hover:text-red-500'}`}
+            aria-label={inWishlist ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
+            aria-pressed={inWishlist}
           >
-            <FiHeart size={18} fill={inWishlist ? 'currentColor' : 'none'} />
+            <FiHeart size={18} fill={inWishlist ? 'currentColor' : 'none'} aria-hidden="true" />
           </button>
         </div>
         <p className="text-gray-500 text-sm mb-1">{product.description}</p>
@@ -84,6 +86,7 @@ export default function ProductCard({ product }) {
             onClick={handleAddToCart}
             disabled={product.stock <= 0}
             className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-700 cursor-pointer border-none disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label={product.stock <= 0 ? `${product.name} out of stock` : `Add ${product.name} to cart`}
           >
             {product.stock <= 0 ? 'Out of Stock' : 'Add to Cart'}
           </button>

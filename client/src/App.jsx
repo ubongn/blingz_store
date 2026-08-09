@@ -1,61 +1,79 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
-import Home from './pages/Home';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
-import Cart from './pages/Cart';
-import Checkout from './pages/Checkout';
-import OrderConfirmation from './pages/OrderConfirmation';
-import ProductDetail from './pages/ProductDetail';
-import Wishlist from './pages/Wishlist';
-import Profile from './pages/Profile';
-import OrderHistory from './pages/OrderHistory';
-import OrderDetail from './pages/OrderDetail';
-import AdminCoupons from './pages/AdminCoupons';
-import AdminProducts from './pages/AdminProducts';
-import AdminOrders from './pages/AdminOrders';
-import AdminUsers from './pages/AdminUsers';
-import Settings from './pages/Settings';
-import About from './pages/About';
-import Contact from './pages/Contact';
-import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
-import AdminDashboard from './pages/AdminDashboard';
 import ScrollToTop from './components/ScrollToTop';
+import ErrorBoundary from './components/ErrorBoundary';
+import { ProtectedRoute, AdminRoute } from './components/ProtectedRoute';
+
+const Home = lazy(() => import('./pages/Home'));
+const Login = lazy(() => import('./pages/Login'));
+const Signup = lazy(() => import('./pages/Signup'));
+const Cart = lazy(() => import('./pages/Cart'));
+const Checkout = lazy(() => import('./pages/Checkout'));
+const ProductDetail = lazy(() => import('./pages/ProductDetail'));
+const OrderConfirmation = lazy(() => import('./pages/OrderConfirmation'));
+const Wishlist = lazy(() => import('./pages/Wishlist'));
+const Profile = lazy(() => import('./pages/Profile'));
+const OrderHistory = lazy(() => import('./pages/OrderHistory'));
+const OrderDetail = lazy(() => import('./pages/OrderDetail'));
+const Settings = lazy(() => import('./pages/Settings'));
+const About = lazy(() => import('./pages/About'));
+const Contact = lazy(() => import('./pages/Contact'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const AdminProducts = lazy(() => import('./pages/AdminProducts'));
+const AdminOrders = lazy(() => import('./pages/AdminOrders'));
+const AdminCoupons = lazy(() => import('./pages/AdminCoupons'));
+const AdminUsers = lazy(() => import('./pages/AdminUsers'));
+
+function PageLoader() {
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center" role="status" aria-label="Loading page">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+    </div>
+  );
+}
 
 function App() {
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <ScrollToTop />
-      <Navbar />
-      <div className="flex-1">
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/cart" element={<Cart />} />
-          <Route path="/checkout" element={<Checkout />} />
-          <Route path="/product/:id" element={<ProductDetail />} />
-          <Route path="/order-confirmation/:id" element={<OrderConfirmation />} />
-          <Route path="/wishlist" element={<Wishlist />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/orders" element={<OrderHistory />} />
-          <Route path="/orders/:id" element={<OrderDetail />} />
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/admin/products" element={<AdminProducts />} />
-          <Route path="/admin/orders" element={<AdminOrders />} />
-          <Route path="/admin/coupons" element={<AdminCoupons />} />
-          <Route path="/admin/users" element={<AdminUsers />} />
-        </Routes>
+    <ErrorBoundary>
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <ScrollToTop />
+        <Navbar />
+        <div className="flex-1">
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="/product/:id" element={<ProductDetail />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+
+              <Route path="/cart" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
+              <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
+              <Route path="/order-confirmation/:id" element={<ProtectedRoute><OrderConfirmation /></ProtectedRoute>} />
+              <Route path="/wishlist" element={<ProtectedRoute><Wishlist /></ProtectedRoute>} />
+              <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              <Route path="/orders" element={<ProtectedRoute><OrderHistory /></ProtectedRoute>} />
+              <Route path="/orders/:id" element={<ProtectedRoute><OrderDetail /></ProtectedRoute>} />
+
+              <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+              <Route path="/admin/products" element={<AdminRoute><AdminProducts /></AdminRoute>} />
+              <Route path="/admin/orders" element={<AdminRoute><AdminOrders /></AdminRoute>} />
+              <Route path="/admin/coupons" element={<AdminRoute><AdminCoupons /></AdminRoute>} />
+              <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+            </Routes>
+          </Suspense>
+        </div>
+        <Footer />
       </div>
-      <Footer />
-    </div>
+    </ErrorBoundary>
   );
 }
 

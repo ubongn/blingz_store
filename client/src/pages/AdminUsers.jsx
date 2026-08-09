@@ -49,7 +49,7 @@ export default function AdminUsers() {
       toast.error(res.error);
     } else {
       toast.success(action === 'make' ? 'Admin granted' : 'Admin removed');
-      setUsers(prev => prev.map(u => u.id === targetUser.id ? { ...u, is_admin: action === 'make' ? 1 : 0 } : u));
+      setUsers(prev => prev.map(u => u.id === targetUser.id ? { ...u, is_admin: action === 'make' } : u));
     }
     closeModal();
   }

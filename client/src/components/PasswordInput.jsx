@@ -16,8 +16,9 @@ export default function PasswordInput({ className = '', ...props }) {
         onClick={() => setVisible(!visible)}
         className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 bg-transparent border-none cursor-pointer p-0"
         tabIndex={-1}
+        aria-label={visible ? 'Hide password' : 'Show password'}
       >
-        {visible ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+        {visible ? <FiEyeOff size={18} aria-hidden="true" /> : <FiEye size={18} aria-hidden="true" />}
       </button>
     </div>
   );
