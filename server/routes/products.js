@@ -1,12 +1,12 @@
 const express = require('express');
-const { getDb, saveDb } = require('../db');
+const { query } = require('../db');
 const { auth } = require('../middleware/auth');
+const { reviewRules } = require('../middleware/validate');
 
 const router = express.Router();
 
-router.get('/', async (req, res) => {
+router.get('/', async (req, res, next) => {
   try {
-    const db = await getDb();
     const { search, category, page = 1, limit = 12, sort, min_price, max_price } = req.query;
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
@@ -14,25 +14,30 @@ router.get('/', async (req, res) => {
 
     let where = [];
     let params = [];
+    let paramIndex = 1;
 
     if (search) {
-      where.push('(p.name LIKE ? OR p.description LIKE ?)');
-      params.push(`%${search}%`, `%${search}%`);
+      where.push(`(p.name ILIKE $${paramIndex} OR p.description ILIKE $${paramIndex})`);
+      params.push(`%${search}%`);
+      paramIndex++;
     }
 
     if (category) {
-      where.push('p.category = ?');
+      where.push(`p.category = $${paramIndex}`);
       params.push(category);
+      paramIndex++;
     }
 
     if (min_price) {
-      where.push('p.price >= ?');
+      where.push(`p.price >= $${paramIndex}`);
       params.push(parseFloat(min_price));
+      paramIndex++;
     }
 
     if (max_price) {
-      where.push('p.price <= ?');
+      where.push(`p.price <= $${paramIndex}`);
       params.push(parseFloat(max_price));
+      paramIndex++;
     }
 
     const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
@@ -43,157 +48,108 @@ router.get('/', async (req, res) => {
     else if (sort === 'newest') orderBy = 'p.id DESC';
     else if (sort === 'oldest') orderBy = 'p.id ASC';
 
-    const countResult = db.exec(`SELECT COUNT(*) FROM products p ${whereClause}`, params);
-    const total = countResult.length > 0 ? countResult[0].values[0][0] : 0;
+    const countResult = await query(`SELECT COUNT(*)::int FROM products p ${whereClause}`, params);
+    const total = countResult.rows[0].count;
     const totalPages = Math.ceil(total / limitNum);
 
-    const result = db.exec(
+    const result = await query(
       `SELECT p.id, p.name, p.description, p.price, p.image_url, p.category, p.stock
        FROM products p ${whereClause}
        ORDER BY ${orderBy}
-       LIMIT ? OFFSET ?`,
+       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
       [...params, limitNum, offset]
     );
 
-    if (result.length === 0) {
-      return res.json({ products: [], page: pageNum, totalPages, total });
-    }
-
-    const columns = result[0].columns;
-    const products = result[0].values.map(row => {
-      const obj = {};
-      columns.forEach((col, i) => { obj[col] = row[i]; });
-      return obj;
-    });
-
-    res.json({ products, page: pageNum, totalPages, total });
+    res.json({ products: result.rows, page: pageNum, totalPages, total });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.get('/categories', async (req, res) => {
+router.get('/categories', async (req, res, next) => {
   try {
-    const db = await getDb();
-    const result = db.exec('SELECT DISTINCT category FROM products WHERE category != ""');
-    if (result.length === 0) return res.json([]);
-    const categories = result[0].values.map(row => row[0]);
-    res.json(categories);
+    const { rows } = await query("SELECT DISTINCT category FROM products WHERE category != ''");
+    res.json(rows.map(r => r.category));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.get('/:id', async (req, res) => {
+router.get('/:id', async (req, res, next) => {
   try {
-    const db = await getDb();
-    const result = db.exec(
-      'SELECT id, name, description, price, image_url, category, stock FROM products WHERE id = ?',
+    const { rows } = await query(
+      'SELECT id, name, description, price, image_url, category, stock FROM products WHERE id = $1',
       [req.params.id]
     );
 
-    if (result.length === 0 || result[0].values.length === 0) {
+    if (rows.length === 0) {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    const columns = result[0].columns;
-    const product = {};
-    columns.forEach((col, i) => { product[col] = result[0].values[0][i]; });
+    const product = rows[0];
 
-    const reviewResult = db.exec(
+    const reviewResult = await query(
       `SELECT r.rating, r.comment, r.created_at, u.email
        FROM reviews r
        JOIN users u ON r.user_id = u.id
-       WHERE r.product_id = ?
+       WHERE r.product_id = $1
        ORDER BY r.created_at DESC`,
       [req.params.id]
     );
+    product.reviews = reviewResult.rows;
 
-    if (reviewResult.length > 0) {
-      const reviewColumns = reviewResult[0].columns;
-      product.reviews = reviewResult[0].values.map(row => {
-        const obj = {};
-        reviewColumns.forEach((col, i) => { obj[col] = row[i]; });
-        return obj;
-      });
-    } else {
-      product.reviews = [];
-    }
+    const avgResult = await query('SELECT AVG(rating)::numeric(10,1) as avg FROM reviews WHERE product_id = $1', [req.params.id]);
+    product.avgRating = avgResult.rows[0].avg ? parseFloat(avgResult.rows[0].avg) : 0;
 
-    const avgResult = db.exec('SELECT AVG(rating) FROM reviews WHERE product_id = ?', [req.params.id]);
-    product.avgRating = avgResult.length > 0 && avgResult[0].values[0][0] !== null
-      ? Math.round(avgResult[0].values[0][0] * 10) / 10
-      : 0;
-
-    const imagesResult = db.exec(
-      'SELECT id, image_url, sort_order FROM product_images WHERE product_id = ? ORDER BY sort_order',
+    const imagesResult = await query(
+      'SELECT id, image_url, sort_order FROM product_images WHERE product_id = $1 ORDER BY sort_order',
       [req.params.id]
     );
-    if (imagesResult.length > 0) {
-      const imgCols = imagesResult[0].columns;
-      product.images = imagesResult[0].values.map(row => {
-        const obj = {};
-        imgCols.forEach((col, i) => { obj[col] = row[i]; });
-        return obj;
-      });
-    } else {
-      product.images = [];
-    }
+    product.images = imagesResult.rows;
 
     res.json(product);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.post('/:id/reviews', auth, async (req, res) => {
+router.post('/:id/reviews', auth, reviewRules, async (req, res, next) => {
   try {
     const { rating, comment } = req.body;
     const productId = req.params.id;
 
-    if (!rating || rating < 1 || rating > 5) {
-      return res.status(400).json({ error: 'Rating must be between 1 and 5' });
-    }
-
-    const db = await getDb();
-
-    const existing = db.exec(
-      'SELECT id FROM reviews WHERE user_id = ? AND product_id = ?',
+    const existing = await query(
+      'SELECT id FROM reviews WHERE user_id = $1 AND product_id = $2',
       [req.userId, productId]
     );
 
-    if (existing.length > 0 && existing[0].values.length > 0) {
-      db.run('UPDATE reviews SET rating = ?, comment = ? WHERE user_id = ? AND product_id = ?',
+    if (existing.rows.length > 0) {
+      await query('UPDATE reviews SET rating = $1, comment = $2 WHERE user_id = $3 AND product_id = $4',
         [rating, comment || '', req.userId, productId]);
     } else {
-      db.run(
-        'INSERT INTO reviews (user_id, product_id, rating, comment) VALUES (?, ?, ?, ?)',
+      await query(
+        'INSERT INTO reviews (user_id, product_id, rating, comment) VALUES ($1, $2, $3, $4)',
         [req.userId, productId, rating, comment || '']
       );
     }
 
-    const userResult = db.exec('SELECT full_name, email FROM users WHERE id = ?', [req.userId]);
-    const reviewerName = userResult.length > 0 && userResult[0].values.length > 0
-      ? (userResult[0].values[0][0] || userResult[0].values[0][1])
-      : 'Someone';
+    const userResult = await query('SELECT full_name, email FROM users WHERE id = $1', [req.userId]);
+    const reviewerName = userResult.rows[0]?.full_name || userResult.rows[0]?.email || 'Someone';
 
-    const prodResult = db.exec('SELECT name FROM products WHERE id = ?', [productId]);
-    const prodName = prodResult.length > 0 && prodResult[0].values.length > 0 ? prodResult[0].values[0][0] : 'a product';
+    const prodResult = await query('SELECT name FROM products WHERE id = $1', [productId]);
+    const prodName = prodResult.rows[0]?.name || 'a product';
 
-    const adminResult = db.exec('SELECT id FROM users WHERE is_admin = 1');
-    if (adminResult.length > 0) {
-      adminResult[0].values.forEach(row => {
-        db.run(
-          'INSERT INTO notifications (user_id, message, type) VALUES (?, ?, ?)',
-          [row[0], `${reviewerName} left a ${rating}-star review on ${prodName}`, 'review']
-        );
-      });
+    const adminResult = await query('SELECT id FROM users WHERE is_admin = TRUE');
+    for (const row of adminResult.rows) {
+      await query(
+        'INSERT INTO notifications (user_id, message, type) VALUES ($1, $2, $3)',
+        [row.id, `${reviewerName} left a ${rating}-star review on ${prodName}`, 'review']
+      );
     }
 
-    saveDb();
     res.status(201).json({ message: 'Review submitted' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

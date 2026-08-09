@@ -1,110 +1,81 @@
 const express = require('express');
-const { getDb, saveDb } = require('../db');
+const { query } = require('../db');
 const { auth } = require('../middleware/auth');
 
 const router = express.Router();
 
 router.use(auth);
 
-router.get('/', async (req, res) => {
+router.get('/', async (req, res, next) => {
   try {
-    const db = await getDb();
-    const result = db.exec(
+    const { rows } = await query(
       `SELECT id, full_name, address, city, phone, total, status, payment_status, payment_method, coupon_code, discount_amount, created_at
        FROM orders
-       WHERE user_id = ?
+       WHERE user_id = $1
        ORDER BY created_at DESC`,
       [req.userId]
     );
-
-    if (result.length === 0) return res.json([]);
-
-    const columns = result[0].columns;
-    const orders = result[0].values.map(row => {
-      const obj = {};
-      columns.forEach((col, i) => { obj[col] = row[i]; });
-      return obj;
-    });
-
-    res.json(orders);
+    res.json(rows);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.get('/:id', async (req, res) => {
+router.get('/:id', async (req, res, next) => {
   try {
-    const db = await getDb();
-    const result = db.exec(
+    const { rows } = await query(
       `SELECT id, full_name, address, city, phone, total, status, payment_status, payment_method, coupon_code, discount_amount, created_at
        FROM orders
-       WHERE id = ? AND user_id = ?`,
+       WHERE id = $1 AND user_id = $2`,
       [req.params.id, req.userId]
     );
 
-    if (result.length === 0 || result[0].values.length === 0) {
+    if (rows.length === 0) {
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    const columns = result[0].columns;
-    const order = {};
-    columns.forEach((col, i) => { order[col] = result[0].values[0][i]; });
+    const order = rows[0];
 
-    const itemsResult = db.exec(
+    const itemsResult = await query(
       `SELECT oi.product_id, oi.quantity, oi.price, p.name, p.image_url
        FROM order_items oi
        JOIN products p ON oi.product_id = p.id
-       WHERE oi.order_id = ?`,
+       WHERE oi.order_id = $1`,
       [req.params.id]
     );
-
-    if (itemsResult.length > 0) {
-      const itemColumns = itemsResult[0].columns;
-      order.items = itemsResult[0].values.map(row => {
-        const obj = {};
-        itemColumns.forEach((col, i) => { obj[col] = row[i]; });
-        return obj;
-      });
-    } else {
-      order.items = [];
-    }
+    order.items = itemsResult.rows;
 
     res.json(order);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.put('/:id/cancel', async (req, res) => {
+router.put('/:id/cancel', async (req, res, next) => {
   try {
-    const db = await getDb();
-    const result = db.exec(
-      'SELECT id, status FROM orders WHERE id = ? AND user_id = ?',
+    const { rows } = await query(
+      'SELECT id, status FROM orders WHERE id = $1 AND user_id = $2',
       [req.params.id, req.userId]
     );
 
-    if (result.length === 0 || result[0].values.length === 0) {
+    if (rows.length === 0) {
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    const status = result[0].values[0][1];
-    if (status !== 'Processing') {
+    if (rows[0].status !== 'Processing') {
       return res.status(400).json({ error: 'Only processing orders can be cancelled' });
     }
 
-    db.run('UPDATE orders SET status = ? WHERE id = ?', ['Cancelled', req.params.id]);
+    await query('UPDATE orders SET status = $1 WHERE id = $2', ['Cancelled', req.params.id]);
 
-    const itemsResult = db.exec('SELECT product_id, quantity FROM order_items WHERE order_id = ?', [req.params.id]);
-    if (itemsResult.length > 0) {
-      itemsResult[0].values.forEach(([productId, quantity]) => {
-        db.run('UPDATE products SET stock = stock + ? WHERE id = ?', [quantity, productId]);
-      });
+    const itemsResult = await query('SELECT product_id, quantity FROM order_items WHERE order_id = $1', [req.params.id]);
+    for (const item of itemsResult.rows) {
+      await query('UPDATE products SET stock = stock + $1 WHERE id = $2', [item.quantity, item.product_id]);
     }
 
-    saveDb();
     res.json({ message: 'Order cancelled' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

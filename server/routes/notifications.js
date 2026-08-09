@@ -1,51 +1,36 @@
 const express = require('express');
-const { getDb, saveDb } = require('../db');
+const { query } = require('../db');
 const { auth } = require('../middleware/auth');
 
 const router = express.Router();
 
-router.get('/', auth, async (req, res) => {
+router.get('/', auth, async (req, res, next) => {
   try {
-    const db = await getDb();
-    const result = db.exec(
-      'SELECT id, message, type, is_read, created_at FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50',
+    const { rows } = await query(
+      'SELECT id, message, type, is_read, created_at FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50',
       [req.userId]
     );
-
-    if (result.length === 0) return res.json([]);
-
-    const columns = result[0].columns;
-    const notifications = result[0].values.map(row => {
-      const obj = {};
-      columns.forEach((col, i) => { obj[col] = row[i]; });
-      return obj;
-    });
-
-    res.json(notifications);
+    res.json(rows);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.put('/:id/read', auth, async (req, res) => {
+router.put('/:id/read', auth, async (req, res, next) => {
   try {
-    const db = await getDb();
-    db.run('UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?', [req.params.id, req.userId]);
-    saveDb();
+    await query('UPDATE notifications SET is_read = TRUE WHERE id = $1 AND user_id = $2', [req.params.id, req.userId]);
     res.json({ message: 'Marked as read' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.put('/read-all', auth, async (req, res) => {
+router.put('/read-all', auth, async (req, res, next) => {
   try {
-    const db = await getDb();
-    db.run('UPDATE notifications SET is_read = 1 WHERE user_id = ?', [req.userId]);
-    saveDb();
+    await query('UPDATE notifications SET is_read = TRUE WHERE user_id = $1', [req.userId]);
     res.json({ message: 'All marked as read' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

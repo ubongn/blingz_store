@@ -1,78 +1,90 @@
 const express = require('express');
 const Stripe = require('stripe');
-const { getDb, saveDb } = require('../db');
+const { query } = require('../db');
 const { auth } = require('../middleware/auth');
 const { sendEmail, orderConfirmationEmail } = require('../utils/email');
+const { checkoutRules } = require('../middleware/validate');
+const config = require('../config');
 
 const router = express.Router();
-const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
+const stripe = Stripe(config.stripeSecretKey);
 
 router.use(auth);
 
-router.get('/suggest-coupons', async (req, res) => {
+router.get('/suggest-coupons', async (req, res, next) => {
   try {
-    const db = await getDb();
-    const result = db.exec(
+    const { rows } = await query(
       `SELECT code, discount_type, discount_value, min_order_amount, expires_at
        FROM coupons
-       WHERE is_active = 1 AND (max_uses = 0 OR used_count < max_uses)
-       AND (expires_at IS NULL OR expires_at >= datetime('now'))
+       WHERE is_active = TRUE AND (max_uses = 0 OR used_count < max_uses)
+       AND (expires_at IS NULL OR expires_at >= NOW())
        ORDER BY discount_value DESC`
     );
 
-    if (result.length === 0) return res.json([]);
-
-    const coupons = result[0].values.map(row => ({
-      code: row[0],
-      discount_type: row[1],
-      discount_value: row[2],
-      min_order_amount: row[3],
-      label: row[1] === 'percentage' ? `${row[2]}% off` : `₦${row[2]} off`,
-      min_label: row[3] > 0 ? `Min. order ₦${row[3]}` : null,
+    const coupons = rows.map(row => ({
+      code: row.code,
+      discount_type: row.discount_type,
+      discount_value: parseFloat(row.discount_value),
+      min_order_amount: parseFloat(row.min_order_amount),
+      label: row.discount_type === 'percentage' ? `${row.discount_value}% off` : `₦${row.discount_value} off`,
+      min_label: row.min_order_amount > 0 ? `Min. order ₦${row.min_order_amount}` : null,
     }));
 
     res.json(coupons);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.post('/create-payment-intent', async (req, res) => {
+router.post('/create-payment-intent', async (req, res, next) => {
   try {
-    const { amount, coupon_code } = req.body;
+    const { coupon_code } = req.body;
 
-    if (!amount || amount <= 0) {
-      return res.status(400).json({ error: 'Invalid amount' });
+    const cartResult = await query(
+      `SELECT cart.product_id, cart.quantity, products.price, products.stock
+       FROM cart
+       JOIN products ON cart.product_id = products.id
+       WHERE cart.user_id = $1`,
+      [req.userId]
+    );
+
+    if (cartResult.rows.length === 0) {
+      return res.status(400).json({ error: 'Cart is empty' });
     }
 
-    let finalAmount = amount;
+    const cartItems = cartResult.rows;
+    let subtotal = 0;
+    for (const item of cartItems) {
+      subtotal += parseFloat(item.price) * item.quantity;
+    }
+
+    let finalAmount = subtotal;
 
     if (coupon_code) {
-      const db = await getDb();
-      const couponResult = db.exec(
-        'SELECT discount_type, discount_value, min_order_amount, max_uses, used_count, expires_at FROM coupons WHERE code = ? AND is_active = 1',
+      const couponResult = await query(
+        'SELECT discount_type, discount_value, min_order_amount, max_uses, used_count, expires_at FROM coupons WHERE code = $1 AND is_active = TRUE',
         [coupon_code.toUpperCase()]
       );
 
-      if (couponResult.length > 0 && couponResult[0].values.length > 0) {
-        const [discountType, discountValue, minOrder, maxUses, usedCount, expiresAt] = couponResult[0].values[0];
+      if (couponResult.rows.length > 0) {
+        const coupon = couponResult.rows[0];
 
-        if (maxUses > 0 && usedCount >= maxUses) {
+        if (coupon.max_uses > 0 && coupon.used_count >= coupon.max_uses) {
           return res.status(400).json({ error: 'Coupon usage limit reached' });
         }
 
-        if (expiresAt && new Date(expiresAt) < new Date()) {
+        if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
           return res.status(400).json({ error: 'Coupon has expired' });
         }
 
-        if (amount < minOrder) {
-          return res.status(400).json({ error: `Minimum order amount is ₦${minOrder}` });
+        if (subtotal < parseFloat(coupon.min_order_amount)) {
+          return res.status(400).json({ error: `Minimum order amount is ₦${coupon.min_order_amount}` });
         }
 
-        if (discountType === 'percentage') {
-          finalAmount = amount - (amount * discountValue / 100);
+        if (coupon.discount_type === 'percentage') {
+          finalAmount = subtotal - (subtotal * parseFloat(coupon.discount_value) / 100);
         } else {
-          finalAmount = amount - discountValue;
+          finalAmount = subtotal - parseFloat(coupon.discount_value);
         }
 
         if (finalAmount < 0) finalAmount = 0;
@@ -83,6 +95,8 @@ router.post('/create-payment-intent', async (req, res) => {
       amount: Math.round(finalAmount * 100),
       currency: 'ngn',
       automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+    }, {
+      idempotencyKey: req.headers['idempotency-key'] || require('crypto').randomUUID(),
     });
 
     res.json({
@@ -91,11 +105,11 @@ router.post('/create-payment-intent', async (req, res) => {
       finalAmount,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.post('/validate-coupon', async (req, res) => {
+router.post('/validate-coupon', async (req, res, next) => {
   try {
     const { code, orderAmount } = req.body;
 
@@ -103,162 +117,178 @@ router.post('/validate-coupon', async (req, res) => {
       return res.status(400).json({ error: 'Coupon code is required' });
     }
 
-    const db = await getDb();
-    const result = db.exec(
-      'SELECT id, discount_type, discount_value, min_order_amount, max_uses, used_count, expires_at FROM coupons WHERE code = ? AND is_active = 1',
+    const { rows } = await query(
+      'SELECT id, discount_type, discount_value, min_order_amount, max_uses, used_count, expires_at FROM coupons WHERE code = $1 AND is_active = TRUE',
       [code.toUpperCase()]
     );
 
-    if (result.length === 0 || result[0].values.length === 0) {
+    if (rows.length === 0) {
       return res.status(404).json({ error: 'Invalid coupon code' });
     }
 
-    const [id, discountType, discountValue, minOrder, maxUses, usedCount, expiresAt] = result[0].values[0];
+    const coupon = rows[0];
 
-    if (maxUses > 0 && usedCount >= maxUses) {
+    if (coupon.max_uses > 0 && coupon.used_count >= coupon.max_uses) {
       return res.status(400).json({ error: 'Coupon usage limit reached' });
     }
 
-    if (expiresAt && new Date(expiresAt) < new Date()) {
+    if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
       return res.status(400).json({ error: 'Coupon has expired' });
     }
 
-    if (orderAmount < minOrder) {
-      return res.status(400).json({ error: `Minimum order amount is ₦${minOrder}` });
+    if (orderAmount < parseFloat(coupon.min_order_amount)) {
+      return res.status(400).json({ error: `Minimum order amount is ₦${coupon.min_order_amount}` });
     }
 
     let discountAmount = 0;
-    if (discountType === 'percentage') {
-      discountAmount = orderAmount * discountValue / 100;
+    if (coupon.discount_type === 'percentage') {
+      discountAmount = orderAmount * parseFloat(coupon.discount_value) / 100;
     } else {
-      discountAmount = discountValue;
+      discountAmount = parseFloat(coupon.discount_value);
     }
 
     res.json({
       code: code.toUpperCase(),
-      discount_type: discountType,
-      discount_value: discountValue,
+      discount_type: coupon.discount_type,
+      discount_value: parseFloat(coupon.discount_value),
       discount_amount: discountAmount,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', checkoutRules, async (req, res, next) => {
   try {
     const { full_name, address, city, phone, payment_intent_id, coupon_code, discount_amount } = req.body;
-
-    if (!full_name || !address || !city || !phone) {
-      return res.status(400).json({ error: 'All shipping fields are required' });
-    }
 
     if (!payment_intent_id) {
       return res.status(400).json({ error: 'Payment is required' });
     }
 
-    const db = await getDb();
+    const paymentIntent = await stripe.paymentIntents.retrieve(payment_intent_id);
+    if (paymentIntent.status !== 'succeeded') {
+      return res.status(400).json({ error: 'Payment not completed' });
+    }
 
-    const cartResult = db.exec(
+    const cartResult = await query(
       `SELECT cart.product_id, cart.quantity, products.price, products.stock
        FROM cart
        JOIN products ON cart.product_id = products.id
-       WHERE cart.user_id = ?`,
+       WHERE cart.user_id = $1`,
       [req.userId]
     );
 
-    if (cartResult.length === 0 || cartResult[0].values.length === 0) {
+    if (cartResult.rows.length === 0) {
       return res.status(400).json({ error: 'Cart is empty' });
     }
 
-    const cartItems = cartResult[0].values.map(row => ({
-      product_id: row[0],
-      quantity: row[1],
-      price: row[2],
-      stock: row[3],
-    }));
+    const cartItems = cartResult.rows;
 
     for (const item of cartItems) {
       if (item.quantity > item.stock) {
-        return res.status(400).json({ error: `Not enough stock for one of the items` });
+        return res.status(400).json({ error: 'Not enough stock for one of the items' });
       }
     }
 
-    const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const subtotal = cartItems.reduce((sum, item) => sum + parseFloat(item.price) * item.quantity, 0);
     const total = subtotal - (discount_amount || 0);
 
-    db.run(
-      'INSERT INTO orders (user_id, full_name, address, city, phone, total, payment_status, payment_method, stripe_payment_intent_id, coupon_code, discount_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    const expectedAmount = Math.round(total * 100);
+    if (paymentIntent.amount !== expectedAmount) {
+      return res.status(400).json({ error: 'Payment amount mismatch' });
+    }
+
+    const orderResult = await query(
+      'INSERT INTO orders (user_id, full_name, address, city, phone, total, payment_status, payment_method, stripe_payment_intent_id, coupon_code, discount_amount) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id',
       [req.userId, full_name, address, city, phone, total, 'paid', 'stripe', payment_intent_id, coupon_code || '', discount_amount || 0]
     );
-
-    const orderIdResult = db.exec('SELECT last_insert_rowid()');
-    const orderId = orderIdResult[0].values[0][0];
+    const orderId = orderResult.rows[0].id;
 
     for (const item of cartItems) {
-      db.run(
-        'INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)',
+      await query(
+        'INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ($1, $2, $3, $4)',
         [orderId, item.product_id, item.quantity, item.price]
       );
-      db.run(
-        'UPDATE products SET stock = stock - ? WHERE id = ?',
-        [item.quantity, item.product_id]
-      );
+      await query('UPDATE products SET stock = stock - $1 WHERE id = $2', [item.quantity, item.product_id]);
 
       const newStock = item.stock - item.quantity;
       if (newStock <= 5) {
-        const prodResult = db.exec('SELECT name FROM products WHERE id = ?', [item.product_id]);
-        const prodName = prodResult.length > 0 && prodResult[0].values.length > 0 ? prodResult[0].values[0][0] : 'Product';
-        const adminResult = db.exec('SELECT id FROM users WHERE is_admin = 1');
-        if (adminResult.length > 0) {
-          adminResult[0].values.forEach(row => {
-            db.run(
-              'INSERT INTO notifications (user_id, message, type) VALUES (?, ?, ?)',
-              [row[0], `Low stock: ${prodName} has only ${newStock} left`, 'stock']
-            );
-          });
+        const prodResult = await query('SELECT name FROM products WHERE id = $1', [item.product_id]);
+        const prodName = prodResult.rows[0]?.name || 'Product';
+        const adminResult = await query('SELECT id FROM users WHERE is_admin = TRUE');
+        for (const row of adminResult.rows) {
+          await query(
+            'INSERT INTO notifications (user_id, message, type) VALUES ($1, $2, $3)',
+            [row.id, `Low stock: ${prodName} has only ${newStock} left`, 'stock']
+          );
         }
       }
     }
 
     if (coupon_code) {
-      db.run('UPDATE coupons SET used_count = used_count + 1 WHERE code = ?', [coupon_code.toUpperCase()]);
+      await query('UPDATE coupons SET used_count = used_count + 1 WHERE code = $1', [coupon_code.toUpperCase()]);
     }
 
-    db.run(
-      'INSERT INTO notifications (user_id, message, type) VALUES (?, ?, ?)',
+    await query(
+      'INSERT INTO notifications (user_id, message, type) VALUES ($1, $2, $3)',
       [req.userId, `Your order #${orderId} has been placed successfully`, 'order']
     );
 
-    const adminResult = db.exec('SELECT id FROM users WHERE is_admin = 1');
-    if (adminResult.length > 0) {
-      const userName = full_name || 'A customer';
-      adminResult[0].values.forEach(row => {
-        db.run(
-          'INSERT INTO notifications (user_id, message, type) VALUES (?, ?, ?)',
-          [row[0], `New order #${orderId} placed by ${userName}`, 'order']
-        );
-      });
+    const adminResult = await query('SELECT id FROM users WHERE is_admin = TRUE');
+    for (const row of adminResult.rows) {
+      await query(
+        'INSERT INTO notifications (user_id, message, type) VALUES ($1, $2, $3)',
+        [row.id, `New order #${orderId} placed by ${full_name}`, 'order']
+      );
     }
 
-    db.run('DELETE FROM cart WHERE user_id = ?', [req.userId]);
-    saveDb();
+    await query('DELETE FROM cart WHERE user_id = $1', [req.userId]);
 
     res.status(201).json({ message: 'Order placed', orderId });
 
-    const emailItems = cartItems.map(item => {
-      const nameResult = db.exec('SELECT name FROM products WHERE id = ?', [item.product_id]);
-      const name = nameResult.length > 0 && nameResult[0].values.length > 0 ? nameResult[0].values[0][0] : 'Product';
-      return { name, quantity: item.quantity, price: item.price };
-    });
-    const userEmailResult = db.exec('SELECT email FROM users WHERE id = ?', [req.userId]);
-    const userEmail = userEmailResult.length > 0 && userEmailResult[0].values.length > 0 ? userEmailResult[0].values[0][0] : null;
-    if (userEmail) {
-      sendEmail(userEmail, `Order #${orderId} Confirmed`, orderConfirmationEmail(full_name, orderId, total, emailItems));
+    const emailItems = [];
+    for (const item of cartItems) {
+      const nameResult = await query('SELECT name FROM products WHERE id = $1', [item.product_id]);
+      emailItems.push({
+        name: nameResult.rows[0]?.name || 'Product',
+        quantity: item.quantity,
+        price: parseFloat(item.price),
+      });
+    }
+    const userEmailResult = await query('SELECT email FROM users WHERE id = $1', [req.userId]);
+    if (userEmailResult.rows.length > 0) {
+      sendEmail(userEmailResult.rows[0].email, `Order #${orderId} Confirmed`, orderConfirmationEmail(full_name, orderId, total, emailItems));
     }
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
+});
+
+router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, config.stripeWebhookSecret);
+  } catch (err) {
+    console.error('[Stripe] Webhook signature verification failed:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  if (event.type === 'payment_intent.succeeded') {
+    const paymentIntent = event.data.object;
+    console.log(`[Stripe] Payment succeeded: ${paymentIntent.id}`);
+  } else if (event.type === 'payment_intent.payment_failed') {
+    const paymentIntent = event.data.object;
+    console.log(`[Stripe] Payment failed: ${paymentIntent.id}`);
+    await query(
+      "UPDATE orders SET payment_status = 'failed' WHERE stripe_payment_intent_id = $1",
+      [paymentIntent.id]
+    );
+  }
+
+  res.json({ received: true });
 });
 
 module.exports = router;

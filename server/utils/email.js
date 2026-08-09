@@ -1,25 +1,24 @@
 const nodemailer = require('nodemailer');
+const config = require('../config');
 
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: process.env.SMTP_PORT || 587,
+  host: config.smtp.host,
+  port: config.smtp.port,
   secure: false,
   auth: {
-    user: process.env.SMTP_USER || '',
-    pass: process.env.SMTP_PASS || '',
+    user: config.smtp.user,
+    pass: config.smtp.pass,
   },
 });
 
-const FROM = process.env.SMTP_FROM || 'BlingzStore <noreply@blingzstore.com>';
-
 async function sendEmail(to, subject, html) {
-  if (!process.env.SMTP_USER) {
+  if (!config.smtp.user) {
     console.log(`[Email] SMTP not configured. Would send to: ${to}`);
     console.log(`[Email] Subject: ${subject}`);
     return;
   }
   try {
-    await transporter.sendMail({ from: FROM, to, subject, html });
+    await transporter.sendMail({ from: config.smtp.from, to, subject, html });
     console.log(`[Email] Sent to ${to}: ${subject}`);
   } catch (err) {
     console.error(`[Email] Failed to send to ${to}:`, err.message);
@@ -33,7 +32,7 @@ function welcomeEmail(name) {
       <p>Hi ${name || 'there'},</p>
       <p>Thank you for joining BlingzStore. We're excited to have you!</p>
       <p>Browse our collection of premium hair products, organic honey, and delicious plantain chips.</p>
-      <a href="http://localhost:3000" style="display: inline-block; background: #1a1a1a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; margin-top: 16px;">Start Shopping</a>
+      <a href="${config.clientUrl}" style="display: inline-block; background: #1a1a1a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; margin-top: 16px;">Start Shopping</a>
       <p style="margin-top: 24px; color: #666; font-size: 12px;">BlingzStore - Abuja, Nigeria</p>
     </div>
   `;
@@ -52,7 +51,7 @@ function orderConfirmationEmail(name, orderId, total, items) {
         <p style="margin: 12px 0 0; font-size: 18px;"><strong>Total: ₦${total.toFixed(2)}</strong></p>
       </div>
       <p>We'll notify you when your order ships.</p>
-      <a href="http://localhost:3000/orders/${orderId}" style="display: inline-block; background: #1a1a1a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; margin-top: 16px;">View Order</a>
+      <a href="${config.clientUrl}/orders/${orderId}" style="display: inline-block; background: #1a1a1a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; margin-top: 16px;">View Order</a>
       <p style="margin-top: 24px; color: #666; font-size: 12px;">BlingzStore - Abuja, Nigeria</p>
     </div>
   `;
@@ -64,7 +63,7 @@ function orderShippedEmail(name, orderId) {
       <h2 style="color: #1a1a1a;">Your Order Has Shipped!</h2>
       <p>Hi ${name},</p>
       <p>Great news! Your order <strong>#${orderId}</strong> is on its way to you.</p>
-      <a href="http://localhost:3000/orders/${orderId}" style="display: inline-block; background: #1a1a1a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; margin-top: 16px;">Track Order</a>
+      <a href="${config.clientUrl}/orders/${orderId}" style="display: inline-block; background: #1a1a1a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; margin-top: 16px;">Track Order</a>
       <p style="margin-top: 24px; color: #666; font-size: 12px;">BlingzStore - Abuja, Nigeria</p>
     </div>
   `;
@@ -77,7 +76,7 @@ function orderDeliveredEmail(name, orderId) {
       <p>Hi ${name},</p>
       <p>Your order <strong>#${orderId}</strong> has been delivered. We hope you love your products!</p>
       <p>Got a moment? Leave us a review to help other shoppers.</p>
-      <a href="http://localhost:3000/orders/${orderId}" style="display: inline-block; background: #1a1a1a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; margin-top: 16px;">Leave a Review</a>
+      <a href="${config.clientUrl}/orders/${orderId}" style="display: inline-block; background: #1a1a1a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; margin-top: 16px;">Leave a Review</a>
       <p style="margin-top: 24px; color: #666; font-size: 12px;">BlingzStore - Abuja, Nigeria</p>
     </div>
   `;
