@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { apiFetch } from '../api';
 import ProductCard from '../components/ProductCard';
@@ -35,7 +34,7 @@ export default function Home() {
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
-    setLoading(true);
+    setLoading(true); // eslint-disable-line react-hooks/set-state-in-effect
     const params = new URLSearchParams();
     if (search) params.set('search', search);
     if (selectedCategory) params.set('category', selectedCategory);

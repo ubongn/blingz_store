@@ -12,14 +12,6 @@ export default function AdminUsers() {
   const { isLoggedIn, user } = useAuth();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!isLoggedIn || !user?.is_admin) {
-      navigate('/');
-      return;
-    }
-    loadUsers();
-  }, [isLoggedIn, user, navigate]);
-
   async function loadUsers() {
     const data = await apiFetch('/api/admin/users');
     if (Array.isArray(data)) {
@@ -27,6 +19,14 @@ export default function AdminUsers() {
     }
     setLoading(false);
   }
+
+  useEffect(() => {
+    if (!isLoggedIn || !user?.is_admin) {
+      navigate('/');
+      return;
+    }
+    loadUsers(); // eslint-disable-line react-hooks/set-state-in-effect
+  }, [isLoggedIn, user, navigate]);
 
   function openModal(u, action) {
     setModal({ show: true, user: u, action });

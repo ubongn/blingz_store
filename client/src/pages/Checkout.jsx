@@ -8,7 +8,7 @@ import toast from 'react-hot-toast';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
-function CheckoutForm({ items, total, form, couponCode, discountAmount }) {
+function CheckoutForm({ total, form, couponCode, discountAmount }) {
   const stripe = useStripe();
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
@@ -95,7 +95,7 @@ export default function Checkout() {
   const [couponLoading, setCouponLoading] = useState(false);
   const [clientSecret, setClientSecret] = useState('');
   const [suggestedCoupons, setSuggestedCoupons] = useState([]);
-  const { isLoggedIn, refreshCart } = useAuth();
+  const { isLoggedIn } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {

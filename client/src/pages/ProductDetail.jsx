@@ -15,7 +15,7 @@ export default function ProductDetail() {
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, setCartCount } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {

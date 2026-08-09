@@ -18,14 +18,6 @@ export default function AdminOrders() {
   const { isLoggedIn, user } = useAuth();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!isLoggedIn || !user?.is_admin) {
-      navigate('/');
-      return;
-    }
-    loadOrders();
-  }, [isLoggedIn, user, navigate]);
-
   async function loadOrders() {
     const data = await apiFetch('/api/admin/orders');
     if (Array.isArray(data)) {
@@ -33,6 +25,14 @@ export default function AdminOrders() {
     }
     setLoading(false);
   }
+
+  useEffect(() => {
+    if (!isLoggedIn || !user?.is_admin) {
+      navigate('/');
+      return;
+    }
+    loadOrders(); // eslint-disable-line react-hooks/set-state-in-effect
+  }, [isLoggedIn, user, navigate]);
 
   async function updateStatus(orderId, status) {
     const res = await apiFetch(`/api/admin/orders/${orderId}/status`, {

@@ -12,7 +12,7 @@ export default function Profile() {
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const { isLoggedIn, setUser } = useAuth();
+  const { isLoggedIn, user, setUser } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -45,7 +45,7 @@ export default function Profile() {
       toast.error(res.error);
     } else {
       toast.success('Profile updated');
-      setUser({ ...useAuth().user, full_name: fullName, email, avatar_url: avatarUrl });
+      setUser({ ...user, full_name: fullName, email, avatar_url: avatarUrl });
     }
   }
 
@@ -68,7 +68,7 @@ export default function Profile() {
       toast.error(data.error);
     } else {
       setAvatarUrl(data.url);
-      setUser({ ...useAuth().user, avatar_url: data.url });
+      setUser({ ...user, avatar_url: data.url });
       toast.success('Avatar updated');
     }
   }

@@ -16,7 +16,7 @@ export default function Cart() {
       navigate('/login');
       return;
     }
-    loadCart();
+    loadCart(); // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn, navigate]);
 
   async function loadCart() {

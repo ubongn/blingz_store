@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { apiFetch } from '../api';
 import toast from 'react-hot-toast';
@@ -24,7 +25,7 @@ export function AuthProvider({ children }) {
       });
     } else {
       localStorage.removeItem('token');
-      setUser(null);
+      setUser(null); // eslint-disable-line react-hooks/set-state-in-effect
     }
   }, [token]);
 
@@ -53,7 +54,7 @@ export function AuthProvider({ children }) {
   }, [token]);
 
   useEffect(() => {
-    refreshCart();
+    refreshCart(); // eslint-disable-line react-hooks/set-state-in-effect
     refreshNotifications();
   }, [token, refreshCart, refreshNotifications]);
 
