@@ -1,180 +1,226 @@
-const initSqlJs = require('sql.js');
-const fs = require('fs');
-const path = require('path');
+const { Pool } = require('pg');
+const bcrypt = require('bcrypt');
+const config = require('./config');
 
-const DB_PATH = path.join(__dirname, 'store.db');
+let pool;
 
-let db;
-
-async function getDb() {
-  if (db) return db;
-
-  const SQL = await initSqlJs();
-
-  if (fs.existsSync(DB_PATH)) {
-    const buffer = fs.readFileSync(DB_PATH);
-    db = new SQL.Database(buffer);
-  } else {
-    db = new SQL.Database();
+function getPool() {
+  if (!pool) {
+    pool = new Pool({
+      connectionString: config.databaseUrl,
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
+    });
+    pool.on('error', (err) => {
+      console.error('[DB] Unexpected error on idle client:', err.message);
+    });
   }
+  return pool;
+}
 
-  db.run(`
+async function query(text, params) {
+  const client = await getPool().connect();
+  try {
+    const result = await client.query(text, params);
+    return result;
+  } finally {
+    client.release();
+  }
+}
+
+async function initDatabase() {
+  const db = getPool();
+
+  await db.query(`
     CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      email TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      full_name TEXT DEFAULT ''
+      id SERIAL PRIMARY KEY,
+      email VARCHAR(255) UNIQUE NOT NULL,
+      password VARCHAR(255) NOT NULL,
+      full_name VARCHAR(255) DEFAULT '',
+      is_admin BOOLEAN DEFAULT FALSE,
+      avatar_url TEXT DEFAULT ''
     )
   `);
 
-  try { db.run('ALTER TABLE users ADD COLUMN full_name TEXT DEFAULT ""'); } catch(e) {}
-
-  db.run(`
+  await db.query(`
     CREATE TABLE IF NOT EXISTS products (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      description TEXT,
-      price REAL NOT NULL,
-      image_url TEXT,
-      category TEXT DEFAULT '',
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      description TEXT DEFAULT '',
+      price DECIMAL(10,2) NOT NULL,
+      image_url TEXT DEFAULT '',
+      category VARCHAR(100) DEFAULT '',
       stock INTEGER DEFAULT 0
     )
   `);
 
-  try { db.run('ALTER TABLE products ADD COLUMN category TEXT DEFAULT ""'); } catch(e) {}
-  try { db.run('ALTER TABLE products ADD COLUMN stock INTEGER DEFAULT 0'); } catch(e) {}
-
-  db.run(`
+  await db.query(`
     CREATE TABLE IF NOT EXISTS cart (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      product_id INTEGER NOT NULL,
-      quantity INTEGER DEFAULT 1,
-      FOREIGN KEY (user_id) REFERENCES users(id),
-      FOREIGN KEY (product_id) REFERENCES products(id)
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      quantity INTEGER DEFAULT 1
     )
   `);
 
-  db.run(`
+  await db.query(`
     CREATE TABLE IF NOT EXISTS orders (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      full_name TEXT NOT NULL,
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      full_name VARCHAR(255) NOT NULL,
       address TEXT NOT NULL,
-      city TEXT NOT NULL,
-      phone TEXT NOT NULL,
-      total REAL NOT NULL,
-      status TEXT DEFAULT 'Processing',
-      created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (user_id) REFERENCES users(id)
+      city VARCHAR(255) NOT NULL,
+      phone VARCHAR(50) NOT NULL,
+      total DECIMAL(10,2) NOT NULL,
+      status VARCHAR(50) DEFAULT 'Processing',
+      payment_status VARCHAR(50) DEFAULT 'pending',
+      payment_method VARCHAR(50) DEFAULT '',
+      stripe_payment_intent_id TEXT DEFAULT '',
+      coupon_code VARCHAR(50) DEFAULT '',
+      discount_amount DECIMAL(10,2) DEFAULT 0,
+      created_at TIMESTAMP DEFAULT NOW()
     )
   `);
 
-  try { db.run("ALTER TABLE orders ADD COLUMN status TEXT DEFAULT 'Processing'"); } catch(e) {}
-
-  db.run(`
+  await db.query(`
     CREATE TABLE IF NOT EXISTS order_items (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      order_id INTEGER NOT NULL,
-      product_id INTEGER NOT NULL,
+      id SERIAL PRIMARY KEY,
+      order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      product_id INTEGER NOT NULL REFERENCES products(id),
       quantity INTEGER NOT NULL,
-      price REAL NOT NULL,
-      FOREIGN KEY (order_id) REFERENCES orders(id),
-      FOREIGN KEY (product_id) REFERENCES products(id)
+      price DECIMAL(10,2) NOT NULL
     )
   `);
 
-  db.run(`
+  await db.query(`
     CREATE TABLE IF NOT EXISTS reviews (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      product_id INTEGER NOT NULL,
-      rating INTEGER NOT NULL,
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
       comment TEXT DEFAULT '',
-      created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (user_id) REFERENCES users(id),
-      FOREIGN KEY (product_id) REFERENCES products(id)
+      created_at TIMESTAMP DEFAULT NOW()
     )
   `);
 
-  db.run(`
+  await db.query(`
     CREATE TABLE IF NOT EXISTS wishlist (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      product_id INTEGER NOT NULL,
-      created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (user_id) REFERENCES users(id),
-      FOREIGN KEY (product_id) REFERENCES products(id),
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      created_at TIMESTAMP DEFAULT NOW(),
       UNIQUE(user_id, product_id)
     )
   `);
 
-  try { db.run("ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0"); } catch(e) {}
-  try { db.run("ALTER TABLE users ADD COLUMN avatar_url TEXT DEFAULT ''"); } catch(e) {}
-  try { db.run("ALTER TABLE orders ADD COLUMN payment_status TEXT DEFAULT 'pending'"); } catch(e) {}
-  try { db.run("ALTER TABLE orders ADD COLUMN payment_method TEXT DEFAULT ''"); } catch(e) {}
-  try { db.run("ALTER TABLE orders ADD COLUMN stripe_payment_intent_id TEXT DEFAULT ''"); } catch(e) {}
-  try { db.run("ALTER TABLE orders ADD COLUMN coupon_code TEXT DEFAULT ''"); } catch(e) {}
-  try { db.run("ALTER TABLE orders ADD COLUMN discount_amount REAL DEFAULT 0"); } catch(e) {}
-
-  db.run(`
+  await db.query(`
     CREATE TABLE IF NOT EXISTS notifications (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       message TEXT NOT NULL,
-      type TEXT DEFAULT 'info',
-      is_read INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (user_id) REFERENCES users(id)
+      type VARCHAR(50) DEFAULT 'info',
+      is_read BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMP DEFAULT NOW()
     )
   `);
 
-  db.run(`
+  await db.query(`
     CREATE TABLE IF NOT EXISTS coupons (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      code TEXT UNIQUE NOT NULL,
-      discount_type TEXT NOT NULL,
-      discount_value REAL NOT NULL,
-      min_order_amount REAL DEFAULT 0,
+      id SERIAL PRIMARY KEY,
+      code VARCHAR(50) UNIQUE NOT NULL,
+      discount_type VARCHAR(20) NOT NULL CHECK (discount_type IN ('percentage', 'fixed')),
+      discount_value DECIMAL(10,2) NOT NULL,
+      min_order_amount DECIMAL(10,2) DEFAULT 0,
       max_uses INTEGER DEFAULT 0,
       used_count INTEGER DEFAULT 0,
-      expires_at TEXT,
-      is_active INTEGER DEFAULT 1,
-      created_at TEXT DEFAULT (datetime('now'))
+      expires_at TIMESTAMP,
+      is_active BOOLEAN DEFAULT TRUE,
+      created_at TIMESTAMP DEFAULT NOW()
     )
   `);
 
-  db.run(`
+  await db.query(`
     CREATE TABLE IF NOT EXISTS password_resets (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      token TEXT UNIQUE NOT NULL,
-      expires_at TEXT NOT NULL,
-      used INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (user_id) REFERENCES users(id)
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token VARCHAR(255) UNIQUE NOT NULL,
+      expires_at TIMESTAMP NOT NULL,
+      used BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMP DEFAULT NOW()
     )
   `);
 
-  db.run(`
+  await db.query(`
     CREATE TABLE IF NOT EXISTS product_images (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      product_id INTEGER NOT NULL,
+      id SERIAL PRIMARY KEY,
+      product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
       image_url TEXT NOT NULL,
       sort_order INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+      created_at TIMESTAMP DEFAULT NOW()
     )
   `);
 
-  saveDb();
-  return db;
+  // Indexes
+  await db.query('CREATE INDEX IF NOT EXISTS idx_cart_user_id ON cart(user_id)');
+  await db.query('CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id)');
+  await db.query('CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id)');
+  await db.query('CREATE INDEX IF NOT EXISTS idx_reviews_product_id ON reviews(product_id)');
+  await db.query('CREATE INDEX IF NOT EXISTS idx_reviews_user_id ON reviews(user_id)');
+  await db.query('CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id)');
+  await db.query('CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read)');
+  await db.query('CREATE INDEX IF NOT EXISTS idx_password_resets_token ON password_resets(token)');
+  await db.query('CREATE INDEX IF NOT EXISTS idx_products_category ON products(category)');
+  await db.query('CREATE INDEX IF NOT EXISTS idx_products_name ON products(name)');
+
+  console.log('[DB] Tables and indexes created');
 }
 
-function saveDb() {
-  const data = db.export();
-  const buffer = Buffer.from(data);
-  fs.writeFileSync(DB_PATH, buffer);
+async function seedProducts() {
+  const { rows } = await query('SELECT COUNT(*)::int as count FROM products');
+  if (rows[0].count === 0) {
+    const products = [
+      ['Braided Wig', 'Premium quality braided wig, ready to wear', 25000, 'https://placehold.co/300x300?text=Braided+Wig', 'Hair', 15],
+      ['Curly Hair Extension', 'Natural-looking curly hair extension, soft and fluffy', 15000, 'https://placehold.co/300x300?text=Curly+Hair', 'Hair', 20],
+      ['Straight Hair Weave', 'Silky straight hair weave, tangle-free', 12000, 'https://placehold.co/300x300?text=Straight+Hair', 'Hair', 10],
+      ['Raw Honey (1L)', 'Pure organic honey sourced from local Nigerian farms', 5000, 'https://placehold.co/300x300?text=Honey+1L', 'Honey', 30],
+      ['Honey (500ml)', 'Pure organic honey, perfect for daily use', 3000, 'https://placehold.co/300x300?text=Honey+500ml', 'Honey', 50],
+      ['Honey (250ml)', 'Small bottle of pure organic honey', 1800, 'https://placehold.co/300x300?text=Honey+250ml', 'Honey', 40],
+      ['Plantain Chips (Spicy)', 'Crispy spicy plantain chips, loved by everyone', 1500, 'https://placehold.co/300x300?text=Spicy+Chips', 'Plantain Chips', 100],
+      ['Plantain Chips (Classic)', 'Classic salted plantain chips, timeless taste', 1200, 'https://placehold.co/300x300?text=Classic+Chips', 'Plantain Chips', 100],
+      ['Plantain Chips (Jollof)', 'Jollof-flavored plantain chips, a Nigerian favorite', 1800, 'https://placehold.co/300x300?text=Jollof+Chips', 'Plantain Chips', 80],
+      ['Coconut Hair Oil', 'Nourishing coconut oil for healthy shiny hair', 3500, 'https://placehold.co/300x300?text=Coconut+Oil', 'Oils & Care', 25],
+      ['Argan Hair Oil', 'Premium argan oil for deep hair conditioning', 4500, 'https://placehold.co/300x300?text=Argan+Oil', 'Oils & Care', 15],
+      ['Hair Growth Serum', 'Stimulates hair growth, reduces breakage', 6000, 'https://placehold.co/300x300?text=Hair+Serum', 'Oils & Care', 20],
+    ];
+
+    for (const [name, desc, price, img, category, stock] of products) {
+      await query(
+        'INSERT INTO products (name, description, price, image_url, category, stock) VALUES ($1, $2, $3, $4, $5, $6)',
+        [name, desc, price, img, category, stock]
+      );
+    }
+    console.log('[DB] Seeded 12 sample products');
+  }
 }
 
-module.exports = { getDb, saveDb };
+async function seedAdmin() {
+  const { rows } = await query('SELECT id FROM users WHERE email = $1', [config.adminEmail]);
+  if (rows.length === 0) {
+    const hash = await bcrypt.hash(config.adminPassword, 12);
+    await query(
+      'INSERT INTO users (email, password, full_name, is_admin) VALUES ($1, $2, $3, TRUE)',
+      [config.adminEmail, hash, 'Admin']
+    );
+    console.log(`[DB] Seeded admin user: ${config.adminEmail}`);
+  }
+}
+
+async function closePool() {
+  if (pool) {
+    await pool.end();
+    pool = null;
+  }
+}
+
+module.exports = { query, getPool, initDatabase, seedProducts, seedAdmin, closePool };
