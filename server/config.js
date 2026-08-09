@@ -1,0 +1,21 @@
+module.exports = {
+  port: parseInt(process.env.PORT) || 5000,
+  databaseUrl: process.env.DATABASE_URL,
+  jwtSecret: process.env.JWT_SECRET,
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  stripeSecretKey: process.env.STRIPE_SECRET_KEY,
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+  corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  nodeEnv: process.env.NODE_ENV || 'development',
+  smtp: {
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT) || 587,
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || '',
+    from: process.env.SMTP_FROM || 'BlingzStore <noreply@blingzstore.com>',
+  },
+  adminEmail: process.env.ADMIN_EMAIL || 'admin@blingzstore.com',
+  adminPassword: process.env.ADMIN_PASSWORD || 'changeme_in_production',
+  baseUrl: process.env.BASE_URL || `http://localhost:${parseInt(process.env.PORT) || 5000}`,
+  clientUrl: process.env.CLIENT_URL || process.env.CORS_ORIGIN || 'http://localhost:5173',
+};
