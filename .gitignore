@@ -2,4 +2,7 @@ node_modules/
 dist/
 store.db
 .env
+.env.local
 server/uploads/*
+!server/uploads/.gitkeep
+*.log
