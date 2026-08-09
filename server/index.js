@@ -2,6 +2,16 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const morgan = require('morgan');
+const crypto = require('crypto');
+
+const { validateEnv } = require('./middleware/validateEnv');
+validateEnv();
+
+const config = require('./config');
+const { initDatabase, seedProducts, seedAdmin, query, closePool } = require('./db');
+const { createSecurityMiddleware } = require('./middleware/security');
+const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 
 const authRoutes = require('./routes/auth');
 const productRoutes = require('./routes/products');
@@ -11,16 +21,47 @@ const wishlistRoutes = require('./routes/wishlist');
 const orderRoutes = require('./routes/orders');
 const notificationRoutes = require('./routes/notifications');
 const adminRoutes = require('./routes/admin');
-const { getDb, saveDb } = require('./db');
-const bcrypt = require('bcrypt');
 
 const app = express();
-const port = 5000;
 
-app.use(cors());
+// Request ID
+app.use((req, res, next) => {
+  req.id = crypto.randomUUID();
+  res.setHeader('X-Request-Id', req.id);
+  next();
+});
+
+// Logging
+app.use(morgan(config.nodeEnv === 'production' ? 'combined' : 'dev'));
+
+// Security
+const { generalLimiter, authLimiter, checkoutLimiter } = createSecurityMiddleware(app);
+app.use(generalLimiter);
+
+// CORS
+app.use(cors({
+  origin: config.corsOrigin,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
+}));
+
+// Stripe webhook needs raw body
+app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
+  // Handled by checkout routes
+  res.status(404).json({ error: 'Webhook not configured' });
+});
+
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Rate limiting on auth routes
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/signup', authLimiter);
+app.use('/api/auth/forgot-password', authLimiter);
+app.use('/checkout', checkoutLimiter);
+
+// Routes
 app.use('/api', authRoutes);
 app.use('/products', productRoutes);
 app.use('/cart', cartRoutes);
@@ -30,60 +71,71 @@ app.use('/orders', orderRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin', adminRoutes);
 
-app.get('/test', (req, res) => {
-  res.json({ message: 'Server is running' });
+// Health check
+app.get('/health', async (req, res) => {
+  try {
+    await query('SELECT 1');
+    res.json({
+      status: 'ok',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+      database: 'connected',
+      environment: config.nodeEnv,
+    });
+  } catch (err) {
+    res.status(503).json({
+      status: 'error',
+      database: 'disconnected',
+      error: config.nodeEnv === 'production' ? 'Database connection failed' : err.message,
+    });
+  }
 });
 
-async function seedProducts() {
-  const db = await getDb();
-  const result = db.exec('SELECT COUNT(*) as count FROM products');
-  const count = result[0].values[0][0];
+// Serve static client build in production
+app.use(express.static(path.join(__dirname, 'public')));
 
-  if (count === 0) {
-    const products = [
-      ['Braided Wig', 'Premium quality braided wig, ready to wear', 25000, 'https://placehold.co/300x300?text=Braided+Wig', 'Hair', 15],
-      ['Curly Hair Extension', 'Natural-looking curly hair extension, soft and fluffy', 15000, 'https://placehold.co/300x300?text=Curly+Hair', 'Hair', 20],
-      ['Straight Hair Weave', 'Silky straight hair weave, tangle-free', 12000, 'https://placehold.co/300x300?text=Straight+Hair', 'Hair', 10],
-      ['Raw Honey (1L)', 'Pure organic honey sourced from local Nigerian farms', 5000, 'https://placehold.co/300x300?text=Honey+1L', 'Honey', 30],
-      ['Honey (500ml)', 'Pure organic honey, perfect for daily use', 3000, 'https://placehold.co/300x300?text=Honey+500ml', 'Honey', 50],
-      ['Honey (250ml)', 'Small bottle of pure organic honey', 1800, 'https://placehold.co/300x300?text=Honey+250ml', 'Honey', 40],
-      ['Plantain Chips (Spicy)', 'Crispy spicy plantain chips, loved by everyone', 1500, 'https://placehold.co/300x300?text=Spicy+Chips', 'Plantain Chips', 100],
-      ['Plantain Chips (Classic)', 'Classic salted plantain chips, timeless taste', 1200, 'https://placehold.co/300x300?text=Classic+Chips', 'Plantain Chips', 100],
-      ['Plantain Chips (Jollof)', 'Jollof-flavored plantain chips, a Nigerian favorite', 1800, 'https://placehold.co/300x300?text=Jollof+Chips', 'Plantain Chips', 80],
-      ['Coconut Hair Oil', 'Nourishing coconut oil for healthy shiny hair', 3500, 'https://placehold.co/300x300?text=Coconut+Oil', 'Oils & Care', 25],
-      ['Argan Hair Oil', 'Premium argan oil for deep hair conditioning', 4500, 'https://placehold.co/300x300?text=Argan+Oil', 'Oils & Care', 15],
-      ['Hair Growth Serum', 'Stimulates hair growth, reduces breakage', 6000, 'https://placehold.co/300x300?text=Hair+Serum', 'Oils & Care', 20],
-    ];
+// SPA catch-all — serve index.html for client-side routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
-    for (const [name, desc, price, img, category, stock] of products) {
-      db.run(
-        'INSERT INTO products (name, description, price, image_url, category, stock) VALUES (?, ?, ?, ?, ?, ?)',
-        [name, desc, price, img, category, stock]
-      );
-    }
-    saveDb();
-    console.log('Seeded 12 sample products');
-  }
+// 404 handler for API routes
+app.use('/api', notFoundHandler);
+app.use('/products', notFoundHandler);
+app.use('/cart', notFoundHandler);
+app.use('/checkout', notFoundHandler);
+app.use('/wishlist', notFoundHandler);
+app.use('/orders', notFoundHandler);
+app.use(notFoundHandler);
+
+// Error handler
+app.use(errorHandler);
+
+// Graceful shutdown
+async function shutdown(signal) {
+  console.log(`\n[Server] Received ${signal}. Shutting down gracefully...`);
+  await closePool();
+  process.exit(0);
 }
 
-async function seedAdmin() {
-  const db = await getDb();
-  const result = db.exec("SELECT id FROM users WHERE email = 'admin@blingzstore.com'");
-  if (result.length === 0 || result[0].values.length === 0) {
-    const hash = await bcrypt.hash('admin123', 10);
-    db.run("INSERT INTO users (email, password, full_name, is_admin) VALUES (?, ?, ?, 1)", ['admin@blingzstore.com', hash, 'Admin']);
-    saveDb();
-    console.log('Seeded admin user: admin@blingzstore.com / admin123');
-  }
-}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 async function start() {
-  await getDb();
-  await seedProducts();
-  await seedAdmin();
-  app.listen(port, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${port}`);
-  });
+  try {
+    await initDatabase();
+    await seedProducts();
+    await seedAdmin();
+    app.listen(config.port, '0.0.0.0', () => {
+      console.log(`[Server] Running on http://localhost:${config.port}`);
+      console.log(`[Server] Environment: ${config.nodeEnv}`);
+    });
+  } catch (err) {
+    console.error('[Server] Failed to start:', err.message);
+    process.exit(1);
+  }
 }
 
 start();
+
+module.exports = app;
