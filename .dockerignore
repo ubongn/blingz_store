@@ -1,0 +1,10 @@
+node_modules
+dist
+.git
+*.db
+.env
+.env.*
+!.env.example
+server/uploads/*
+client/node_modules
+client/dist
