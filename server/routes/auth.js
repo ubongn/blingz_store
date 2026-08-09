@@ -4,9 +4,11 @@ const crypto = require('crypto');
 const multer = require('multer');
 const path = require('path');
 const jwt = require('jsonwebtoken');
-const { getDb, saveDb } = require('../db');
-const { JWT_SECRET, auth } = require('../middleware/auth');
+const { query } = require('../db');
+const { auth } = require('../middleware/auth');
 const { sendEmail, welcomeEmail } = require('../utils/email');
+const { signupRules, changePasswordRules } = require('../middleware/validate');
+const config = require('../config');
 
 const router = express.Router();
 
@@ -29,44 +31,42 @@ const avatarUpload = multer({
   },
 });
 
-router.post('/signup', async (req, res) => {
+const loginAttempts = new Map();
+const LOCKOUT_DURATION = 15 * 60 * 1000;
+const MAX_ATTEMPTS = 5;
+
+router.post('/signup', signupRules, async (req, res, next) => {
   try {
     const { email, password, full_name } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
-    }
-
-    const db = await getDb();
-    const existing = db.exec('SELECT id FROM users WHERE email = ?', [email]);
-    if (existing.length > 0 && existing[0].values.length > 0) {
+    const existing = await query('SELECT id FROM users WHERE email = $1', [email]);
+    if (existing.rows.length > 0) {
       return res.status(409).json({ error: 'Email already registered' });
     }
 
-    const hash = await bcrypt.hash(password, 10);
-    db.run('INSERT INTO users (email, password, full_name) VALUES (?, ?, ?)', [email, hash, full_name || '']);
-    saveDb();
+    const hash = await bcrypt.hash(password, 12);
+    const { rows } = await query(
+      'INSERT INTO users (email, password, full_name) VALUES ($1, $2, $3) RETURNING id',
+      [email, hash, full_name || '']
+    );
 
     const userName = full_name || email;
-    const adminResult = db.exec('SELECT id FROM users WHERE is_admin = 1');
-    if (adminResult.length > 0) {
-      adminResult[0].values.forEach(row => {
-        db.run(
-          'INSERT INTO notifications (user_id, message, type) VALUES (?, ?, ?)',
-          [row[0], `New user ${userName} registered (${email})`, 'user']
-        );
-      });
-      saveDb();
+    const adminResult = await query('SELECT id FROM users WHERE is_admin = TRUE');
+    for (const row of adminResult.rows) {
+      await query(
+        'INSERT INTO notifications (user_id, message, type) VALUES ($1, $2, $3)',
+        [row.id, `New user ${userName} registered (${email})`, 'user']
+      );
     }
 
     res.status(201).json({ message: 'Account created' });
     sendEmail(email, 'Welcome to BlingzStore!', welcomeEmail(full_name || email.split('@')[0]));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
@@ -74,113 +74,102 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const db = await getDb();
-    const result = db.exec('SELECT id, password FROM users WHERE email = ?', [email]);
+    const attempt = loginAttempts.get(email);
+    if (attempt && attempt.count >= MAX_ATTEMPTS && Date.now() - attempt.lastAttempt < LOCKOUT_DURATION) {
+      const remaining = Math.ceil((LOCKOUT_DURATION - (Date.now() - attempt.lastAttempt)) / 60000);
+      return res.status(429).json({ error: `Account locked. Try again in ${remaining} minutes` });
+    }
 
-    if (result.length === 0 || result[0].values.length === 0) {
+    const { rows } = await query('SELECT id, password FROM users WHERE email = $1', [email]);
+
+    if (rows.length === 0) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const [id, storedHash] = result[0].values[0];
-    const match = await bcrypt.compare(password, storedHash);
+    const match = await bcrypt.compare(password, rows[0].password);
 
     if (!match) {
+      const current = loginAttempts.get(email) || { count: 0 };
+      loginAttempts.set(email, { count: current.count + 1, lastAttempt: Date.now() });
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const token = jwt.sign({ userId: id }, JWT_SECRET, { expiresIn: '7d' });
+    loginAttempts.delete(email);
+
+    const token = jwt.sign({ userId: rows[0].id }, config.jwtSecret, {
+      expiresIn: config.jwtExpiresIn,
+      algorithm: 'HS256',
+    });
     res.json({ token });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.get('/profile', auth, async (req, res) => {
+router.get('/profile', auth, async (req, res, next) => {
   try {
-    const db = await getDb();
-    const result = db.exec('SELECT id, email, full_name, is_admin, avatar_url FROM users WHERE id = ?', [req.userId]);
+    const { rows } = await query(
+      'SELECT id, email, full_name, is_admin, avatar_url FROM users WHERE id = $1',
+      [req.userId]
+    );
 
-    if (result.length === 0 || result[0].values.length === 0) {
+    if (rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const columns = result[0].columns;
-    const user = {};
-    columns.forEach((col, i) => { user[col] = result[0].values[0][i]; });
-
-    res.json(user);
+    res.json(rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.put('/profile', auth, async (req, res) => {
+router.put('/profile', auth, async (req, res, next) => {
   try {
     const { full_name } = req.body;
-    const db = await getDb();
-
-    db.run('UPDATE users SET full_name = ? WHERE id = ?',
-      [full_name || '', req.userId]);
-    saveDb();
-
+    await query('UPDATE users SET full_name = $1 WHERE id = $2', [full_name || '', req.userId]);
     res.json({ message: 'Profile updated' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.post('/profile/avatar', auth, avatarUpload.single('avatar'), async (req, res) => {
+router.post('/profile/avatar', auth, avatarUpload.single('avatar'), async (req, res, next) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
-    const url = `http://localhost:5000/uploads/${req.file.filename}`;
-    const db = await getDb();
-    db.run('UPDATE users SET avatar_url = ? WHERE id = ?', [url, req.userId]);
-    saveDb();
+    const url = `${config.baseUrl}/uploads/${req.file.filename}`;
+    await query('UPDATE users SET avatar_url = $1 WHERE id = $2', [url, req.userId]);
     res.json({ url });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.put('/change-password', auth, async (req, res) => {
+router.put('/change-password', auth, changePasswordRules, async (req, res, next) => {
   try {
     const { current_password, new_password } = req.body;
 
-    if (!current_password || !new_password) {
-      return res.status(400).json({ error: 'Current and new password are required' });
-    }
-
-    if (new_password.length < 6) {
-      return res.status(400).json({ error: 'New password must be at least 6 characters' });
-    }
-
-    const db = await getDb();
-    const result = db.exec('SELECT password FROM users WHERE id = ?', [req.userId]);
-
-    if (result.length === 0 || result[0].values.length === 0) {
+    const { rows } = await query('SELECT password FROM users WHERE id = $1', [req.userId]);
+    if (rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const storedHash = result[0].values[0][0];
-    const match = await bcrypt.compare(current_password, storedHash);
-
+    const match = await bcrypt.compare(current_password, rows[0].password);
     if (!match) {
       return res.status(401).json({ error: 'Current password is incorrect' });
     }
 
-    const hash = await bcrypt.hash(new_password, 10);
-    db.run('UPDATE users SET password = ? WHERE id = ?', [hash, req.userId]);
-    saveDb();
+    const hash = await bcrypt.hash(new_password, 12);
+    await query('UPDATE users SET password = $1 WHERE id = $2', [hash, req.userId]);
 
     res.json({ message: 'Password changed' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.delete('/account', auth, async (req, res) => {
+router.delete('/account', auth, async (req, res, next) => {
   try {
     const { password } = req.body;
 
@@ -188,38 +177,33 @@ router.delete('/account', auth, async (req, res) => {
       return res.status(400).json({ error: 'Password is required' });
     }
 
-    const db = await getDb();
-    const result = db.exec('SELECT password, is_admin FROM users WHERE id = ?', [req.userId]);
-
-    if (result.length === 0 || result[0].values.length === 0) {
+    const { rows } = await query('SELECT password, is_admin FROM users WHERE id = $1', [req.userId]);
+    if (rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const [storedHash, isAdmin] = result[0].values[0];
-
-    if (isAdmin) {
+    if (rows[0].is_admin) {
       return res.status(403).json({ error: 'Admin accounts cannot be deleted' });
     }
 
-    const match = await bcrypt.compare(password, storedHash);
+    const match = await bcrypt.compare(password, rows[0].password);
     if (!match) {
       return res.status(401).json({ error: 'Incorrect password' });
     }
 
-    db.run('DELETE FROM reviews WHERE user_id = ?', [req.userId]);
-    db.run('DELETE FROM wishlist WHERE user_id = ?', [req.userId]);
-    db.run('DELETE FROM cart WHERE user_id = ?', [req.userId]);
-    db.run('DELETE FROM notifications WHERE user_id = ?', [req.userId]);
-    db.run('DELETE FROM users WHERE id = ?', [req.userId]);
-    saveDb();
+    await query('DELETE FROM reviews WHERE user_id = $1', [req.userId]);
+    await query('DELETE FROM wishlist WHERE user_id = $1', [req.userId]);
+    await query('DELETE FROM cart WHERE user_id = $1', [req.userId]);
+    await query('DELETE FROM notifications WHERE user_id = $1', [req.userId]);
+    await query('DELETE FROM users WHERE id = $1', [req.userId]);
 
     res.json({ message: 'Account deleted' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', async (req, res, next) => {
   try {
     const { email } = req.body;
 
@@ -227,29 +211,28 @@ router.post('/forgot-password', async (req, res) => {
       return res.status(400).json({ error: 'Email is required' });
     }
 
-    const db = await getDb();
-    const result = db.exec('SELECT id FROM users WHERE email = ?', [email]);
-
-    if (result.length === 0 || result[0].values.length === 0) {
+    const { rows } = await query('SELECT id FROM users WHERE email = $1', [email]);
+    if (rows.length === 0) {
       return res.json({ message: 'If that email exists, a reset link has been sent' });
     }
 
-    const userId = result[0].values[0][0];
+    const userId = rows[0].id;
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
 
-    db.run('DELETE FROM password_resets WHERE user_id = ?', [userId]);
-    db.run('INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, ?)',
-      [userId, token, expiresAt]);
-    saveDb();
+    await query('DELETE FROM password_resets WHERE user_id = $1', [userId]);
+    await query(
+      'INSERT INTO password_resets (user_id, token, expires_at) VALUES ($1, $2, $3)',
+      [userId, token, expiresAt]
+    );
 
-    res.json({ message: 'If that email exists, a reset link has been sent', token });
+    res.json({ message: 'If that email exists, a reset link has been sent' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', async (req, res, next) => {
   try {
     const { token, password } = req.body;
 
@@ -261,31 +244,27 @@ router.post('/reset-password', async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
 
-    const db = await getDb();
-    const result = db.exec('SELECT user_id, expires_at, used FROM password_resets WHERE token = ?', [token]);
-
-    if (result.length === 0 || result[0].values.length === 0) {
+    const { rows } = await query('SELECT user_id, expires_at, used FROM password_resets WHERE token = $1', [token]);
+    if (rows.length === 0) {
       return res.status(400).json({ error: 'Invalid or expired token' });
     }
 
-    const [userId, expiresAt, used] = result[0].values[0];
-
-    if (used) {
+    const reset = rows[0];
+    if (reset.used) {
       return res.status(400).json({ error: 'Token has already been used' });
     }
 
-    if (new Date(expiresAt) < new Date()) {
+    if (new Date(reset.expires_at) < new Date()) {
       return res.status(400).json({ error: 'Token has expired' });
     }
 
-    const hash = await bcrypt.hash(password, 10);
-    db.run('UPDATE users SET password = ? WHERE id = ?', [hash, userId]);
-    db.run('UPDATE password_resets SET used = 1 WHERE token = ?', [token]);
-    saveDb();
+    const hash = await bcrypt.hash(password, 12);
+    await query('UPDATE users SET password = $1 WHERE id = $2', [hash, reset.user_id]);
+    await query('UPDATE password_resets SET used = TRUE WHERE token = $1', [token]);
 
     res.json({ message: 'Password reset successful' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

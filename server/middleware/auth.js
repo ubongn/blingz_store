@@ -1,6 +1,5 @@
 const jwt = require('jsonwebtoken');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this';
+const config = require('../config');
 
 function auth(req, res, next) {
   const header = req.headers.authorization;
@@ -12,7 +11,7 @@ function auth(req, res, next) {
   const token = header.split(' ')[1];
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, config.jwtSecret, { algorithms: ['HS256'] });
     req.userId = decoded.userId;
     next();
   } catch {
@@ -20,4 +19,4 @@ function auth(req, res, next) {
   }
 }
 
-module.exports = { auth, JWT_SECRET };
+module.exports = { auth };
