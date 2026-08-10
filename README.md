@@ -1,6 +1,6 @@
 # BlingzStore
 
-A full-stack ecommerce web application for selling women's hair products, organic honey, and plantain chips. Built with React, Express, and SQLite.
+A full-stack ecommerce web application for selling women's hair products, organic honey, and plantain chips. Built with React, Express, and PostgreSQL.
 
 **Live Demo:** [blingzstore.com](https://blingzstore.com)
 
@@ -17,14 +17,24 @@ A full-stack ecommerce web application for selling women's hair products, organi
 
 **Backend:**
 - Express.js
-- SQLite via sql.js (file-based)
-- JWT authentication (7-day expiry)
-- bcrypt password hashing
+- PostgreSQL (via `pg`)
+- JWT authentication (HS256, 7-day expiry)
+- bcrypt password hashing (12 rounds)
 - Multer (file uploads)
 - Nodemailer (email notifications)
+- Helmet (security headers)
+- express-rate-limit (rate limiting)
+- morgan (HTTP logging)
+- express-validator (input validation)
+- xss (sanitization)
 
 **Payment:**
 - Stripe (Nigerian Naira)
+
+**DevOps:**
+- Docker + Docker Compose
+- GitHub Actions CI (lint + build)
+- PostgreSQL 16
 
 ## Features
 
@@ -58,6 +68,17 @@ A full-stack ecommerce web application for selling women's hair products, organi
 - Notification polling every 30 seconds with toast popup
 - Email notifications: welcome, order confirmation, shipping, delivery
 
+### Security
+- Helmet security headers (X-Frame-Options, CSP, HSTS, etc.)
+- Rate limiting: general (100/15min), auth (10/15min), checkout (20/15min)
+- Input validation with express-validator on all endpoints
+- XSS sanitization with `xss` library
+- Login lockout after 5 failed attempts (15-minute window)
+- Server-side amount verification (no client-trusted prices)
+- Stripe webhook signature verification
+- JWT pinned to HS256 algorithm
+- Fail-fast environment validation on startup
+
 ### SEO
 - Dynamic page titles and meta descriptions (react-helmet-async)
 - Open Graph tags for social sharing
@@ -75,8 +96,10 @@ blingz_store/
 │   │   │   ├── ProductCard.jsx    # Product card with wishlist toggle
 │   │   │   ├── PasswordInput.jsx  # Password input with show/hide toggle
 │   │   │   ├── ScrollToTop.jsx    # Scroll to top on route change
-│   │   │   └── Skeleton.jsx       # Loading skeleton components
-│   │   ├── pages/             # Route pages
+│   │   │   ├── Skeleton.jsx       # Loading skeleton components
+│   │   │   ├── ErrorBoundary.jsx  # Error boundary with retry
+│   │   │   └── ProtectedRoute.jsx # Auth + admin route guards
+│   │   ├── pages/             # Route pages (lazy-loaded)
 │   │   │   ├── Home.jsx           # Hero, categories, products, testimonials
 │   │   │   ├── ProductDetail.jsx  # Product info, gallery, reviews
 │   │   │   ├── Cart.jsx           # Shopping cart
@@ -117,17 +140,26 @@ blingz_store/
 │   │   ├── notifications.js   # Notification listing + read
 │   │   └── admin.js           # Admin CRUD + dashboard stats + image uploads
 │   ├── middleware/
-│   │   ├── auth.js            # JWT verification
-│   │   └── admin.js           # Admin role check
+│   │   ├── auth.js            # JWT verification (HS256)
+│   │   ├── admin.js           # Admin role check
+│   │   ├── security.js        # Helmet + CORS + rate limiting
+│   │   ├── validate.js        # express-validator chains
+│   │   ├── validateEnv.js     # Fail-fast env validation
+│   │   └── errorHandler.js    # Global error handler + 404
+│   ├── config.js              # Centralized env config
 │   ├── utils/
 │   │   └── email.js           # Nodemailer + email templates
 │   ├── uploads/               # Uploaded images (gitignored)
-│   ├── db.js                  # SQLite schema + migrations
-│   ├── index.js               # Server entry + seed data
-│   ├── store.db               # SQLite database (gitignored)
+│   ├── db.js                  # PostgreSQL schema + Pool + seed data
+│   ├── app.js                 # Express app (no startup)
+│   ├── index.js               # Server entry + DB init + seed
 │   ├── .env                   # Environment variables
 │   └── package.json
 │
+├── Dockerfile                 # Multi-stage Docker build
+├── docker-compose.yml         # PostgreSQL + server
+├── .dockerignore              # Docker ignore rules
+├── .github/workflows/ci.yml   # CI: lint + build
 ├── LICENSE                    # MIT License
 └── README.md
 ```
@@ -136,6 +168,7 @@ blingz_store/
 
 ### Prerequisites
 - Node.js v18+
+- PostgreSQL 16+ (or Docker)
 - npm or yarn
 
 ### Installation
@@ -159,8 +192,20 @@ npm install
 Create `server/.env`:
 
 ```env
+# Database (PostgreSQL)
+DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/blingzstore
+
+# Auth
+JWT_SECRET=your-random-secret-key-min-32-chars
+
 # Stripe (test keys)
 STRIPE_SECRET_KEY=sk_test_your_key_here
+STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
+
+# CORS
+CORS_ORIGIN=http://localhost:3000
+CLIENT_URL=http://localhost:3000
+BASE_URL=http://localhost:5000
 
 # Email (SMTP) — optional, logs to console if not configured
 SMTP_HOST=smtp.gmail.com
@@ -168,12 +213,20 @@ SMTP_PORT=587
 SMTP_USER=your-email@gmail.com
 SMTP_PASS=your-app-password
 SMTP_FROM=BlingzStore <noreply@blingzstore.com>
+
+# Admin (auto-seeded on first run)
+ADMIN_EMAIL=admin@blingzstore.com
+ADMIN_PASSWORD=admin123
+
+NODE_ENV=development
+PORT=5000
 ```
 
 Create `client/.env`:
 
 ```env
 VITE_STRIPE_PUBLISHABLE_KEY=pk_test_your_key_here
+VITE_API_URL=http://localhost:5000
 ```
 
 ### Running
@@ -188,7 +241,20 @@ cd client
 npm run dev
 ```
 
-The database (`store.db`) is created automatically on first run with sample products and admin user.
+### Docker
+
+```bash
+# Start PostgreSQL + server
+docker compose up -d
+
+# Build client for production
+cd client && npm run build
+
+# Copy build to server/public for Docker serving
+cp -r dist ../server/public
+```
+
+The database is created automatically on first run with sample products and admin user.
 
 ## Admin Access
 
@@ -279,9 +345,16 @@ Admin users see the Dashboard, Products, Orders, Coupons, and Users links in the
 | PUT | /api/admin/coupons/:id | Admin | Update coupon |
 | DELETE | /api/admin/coupons/:id | Admin | Delete coupon |
 
+### Health (`/`)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | /health | No | Server + DB health check |
+
 ## Database Schema
 
-10 tables: `users`, `products`, `cart`, `orders`, `order_items`, `reviews`, `wishlist`, `notifications`, `coupons`, `password_resets`, `product_images`
+PostgreSQL with 11 tables: `users`, `products`, `cart`, `orders`, `order_items`, `reviews`, `wishlist`, `notifications`, `coupons`, `password_resets`, `product_images`
+
+10 indexes for performance on foreign keys, search (ILIKE), and common query patterns.
 
 ## License
 
