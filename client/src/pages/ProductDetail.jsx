@@ -3,6 +3,7 @@ import { Helmet } from 'react-helmet-async';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../api';
+import { formatPrice } from '../utils';
 import toast from 'react-hot-toast';
 import { ProductDetailSkeleton } from '../components/Skeleton';
 import { FiArrowLeft, FiStar } from 'react-icons/fi';
@@ -136,7 +137,7 @@ export default function ProductDetail() {
             {product.category && (
               <span className="inline-block bg-gray-100 text-gray-600 text-sm px-3 py-1 rounded mb-4 w-fit">{product.category}</span>
             )}
-            <p className="text-2xl font-bold text-gray-900 mb-4">₦{product.price.toFixed(2)}</p>
+            <p className="text-2xl font-bold text-gray-900 mb-4">{formatPrice(product.price)}</p>
 
             {product.avgRating > 0 && (
               <div className="flex items-center gap-2 mb-4">

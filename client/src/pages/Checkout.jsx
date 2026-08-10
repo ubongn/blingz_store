@@ -4,6 +4,7 @@ import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../api';
+import { formatPrice } from '../utils';
 import toast from 'react-hot-toast';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
@@ -79,7 +80,7 @@ function CheckoutForm({ total, form, couponCode, discountAmount }) {
         disabled={!stripe || processing}
         className="w-full bg-gray-900 text-white py-3 rounded-lg font-medium hover:bg-gray-700 disabled:opacity-50 cursor-pointer border-none"
       >
-        {processing ? 'Processing...' : `Pay ₦${(total - discountAmount).toFixed(2)}`}
+        {processing ? 'Processing...' : `Pay ${formatPrice(total - discountAmount)}`}
       </button>
     </form>
   );
@@ -137,7 +138,7 @@ export default function Checkout() {
     } else {
       setAppliedCoupon(res);
       setDiscountAmount(res.discount_amount);
-      toast.success(`Coupon applied! You save ₦${res.discount_amount.toFixed(2)}`);
+      toast.success(`Coupon applied! You save ${formatPrice(res.discount_amount)}`);
     }
   }
 
@@ -161,7 +162,7 @@ export default function Checkout() {
     } else {
       setAppliedCoupon(res);
       setDiscountAmount(res.discount_amount);
-      toast.success(`Coupon applied! You save ₦${res.discount_amount.toFixed(2)}`);
+      toast.success(`Coupon applied! You save ${formatPrice(res.discount_amount)}`);
     }
   }
 
@@ -202,7 +203,7 @@ export default function Checkout() {
                   <p className="font-medium text-gray-900 text-sm">{item.name}</p>
                   <p className="text-gray-500 text-xs">Qty: {item.quantity}</p>
                 </div>
-                <p className="font-semibold text-gray-900">₦{(item.price * item.quantity).toFixed(2)}</p>
+                <p className="font-semibold text-gray-900">{formatPrice(item.price * item.quantity)}</p>
               </div>
             ))}
           </div>
@@ -257,17 +258,17 @@ export default function Checkout() {
           <div className="mt-4 border-t border-gray-200 pt-4 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Subtotal</span>
-              <span className="text-gray-900">₦{subtotal.toFixed(2)}</span>
+              <span className="text-gray-900">{formatPrice(subtotal)}</span>
             </div>
             {discountAmount > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-green-600">Discount</span>
-                <span className="text-green-600">-₦{discountAmount.toFixed(2)}</span>
+                <span className="text-green-600">-{formatPrice(discountAmount)}</span>
               </div>
             )}
             <div className="flex justify-between border-t border-gray-200 pt-2">
               <span className="font-medium text-gray-700">Total</span>
-              <span className="font-bold text-gray-900 text-lg">₦{finalTotal.toFixed(2)}</span>
+              <span className="font-bold text-gray-900 text-lg">{formatPrice(finalTotal)}</span>
             </div>
           </div>
         </div>

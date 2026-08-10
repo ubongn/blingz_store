@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../api';
+import { formatPrice } from '../utils';
 import toast from 'react-hot-toast';
 import { TableRowSkeleton } from '../components/Skeleton';
 
@@ -95,7 +96,7 @@ export default function AdminOrders() {
                         <p className="text-xs text-gray-500">{order.email}</p>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900">₦{order.total.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{formatPrice(order.total)}</td>
                     <td className="px-4 py-3">
                       <span className={`text-xs font-medium px-2 py-1 rounded-full ${order.payment_status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
                         {order.payment_status === 'paid' ? 'Paid' : 'Pending'}

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../api';
+import { formatPrice } from '../utils';
 import toast from 'react-hot-toast';
 import { CartSkeleton } from '../components/Skeleton';
 
@@ -82,7 +83,7 @@ export default function Cart() {
             <img src={item.image_url} alt={item.name} className="w-20 h-20 object-cover rounded-lg" />
             <div className="flex-1">
               <h3 className="font-semibold text-gray-900">{item.name}</h3>
-              <p className="text-gray-500 text-sm">₦{item.price.toFixed(2)} each</p>
+              <p className="text-gray-500 text-sm">{formatPrice(item.price)} each</p>
               {item.stock <= 5 && (
                 <p className="text-orange-500 text-xs mt-1">Only {item.stock} left in stock</p>
               )}
@@ -105,7 +106,7 @@ export default function Cart() {
               </button>
             </div>
             <div className="text-right">
-              <p className="font-bold text-gray-900">₦{(item.price * item.quantity).toFixed(2)}</p>
+              <p className="font-bold text-gray-900">{formatPrice(item.price * item.quantity)}</p>
               <button
                 onClick={() => handleRemove(item.id)}
                 className="text-red-500 text-sm mt-1 hover:underline bg-transparent border-none cursor-pointer"
@@ -120,7 +121,7 @@ export default function Cart() {
       <div className="mt-6 bg-gray-50 rounded-xl p-6">
         <div className="flex items-center justify-between mb-4">
           <span className="text-lg font-medium text-gray-700">Total</span>
-          <span className="text-2xl font-bold text-gray-900">₦{total.toFixed(2)}</span>
+          <span className="text-2xl font-bold text-gray-900">{formatPrice(total)}</span>
         </div>
         <button
           onClick={() => navigate('/checkout')}

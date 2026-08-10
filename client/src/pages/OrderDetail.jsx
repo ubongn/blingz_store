@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiCheck } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../api';
+import { formatPrice } from '../utils';
 import toast from 'react-hot-toast';
 
 const STATUS_STEPS = ['Processing', 'Shipped', 'Delivered'];
@@ -140,7 +141,7 @@ export default function OrderDetail() {
             {order.discount_amount > 0 && (
               <div className="flex justify-between">
                 <span className="text-gray-500">Discount:</span>
-                <span className="font-medium text-green-600">-₦{order.discount_amount.toFixed(2)}</span>
+                <span className="font-medium text-green-600">-{formatPrice(order.discount_amount)}</span>
               </div>
             )}
           </div>
@@ -152,14 +153,14 @@ export default function OrderDetail() {
                   <p className="text-sm font-medium text-gray-900">{item.name}</p>
                   <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
                 </div>
-                <p className="text-sm font-semibold text-gray-900">₦{(item.price * item.quantity).toFixed(2)}</p>
+                <p className="text-sm font-semibold text-gray-900">{formatPrice(item.price * item.quantity)}</p>
               </div>
             ))}
           </div>
           <div className="border-t border-gray-200 mt-4 pt-4">
             <div className="flex justify-between">
               <span className="font-medium text-gray-700">Total</span>
-              <span className="font-bold text-gray-900">₦{order.total.toFixed(2)}</span>
+              <span className="font-bold text-gray-900">{formatPrice(order.total)}</span>
             </div>
           </div>
         </div>

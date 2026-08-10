@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../api';
+import { formatPrice } from '../utils';
 import { OrderSkeleton } from '../components/Skeleton';
 
 const STATUS_COLORS = {
@@ -65,7 +66,7 @@ export default function OrderHistory() {
                 <p className="text-gray-500 text-sm">{new Date(order.created_at).toLocaleDateString()}</p>
               </div>
               <div className="text-right">
-                <p className="font-bold text-gray-900">₦{order.total.toFixed(2)}</p>
+                <p className="font-bold text-gray-900">{formatPrice(order.total)}</p>
                 <span className={`inline-block text-xs px-2 py-1 rounded font-medium mt-1 ${STATUS_COLORS[order.status] || 'bg-gray-100 text-gray-800'}`}>
                   {order.status}
                 </span>

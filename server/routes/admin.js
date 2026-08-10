@@ -66,8 +66,8 @@ router.get('/stats', async (req, res, next) => {
     const ordersResult = await query('SELECT COUNT(*)::int FROM orders');
     const totalOrders = ordersResult.rows[0].count;
 
-    const revenueResult = await query("SELECT COALESCE(SUM(total), 0)::numeric(10,2) FROM orders WHERE payment_status = 'paid'");
-    const totalRevenue = parseFloat(revenueResult.rows[0].sum);
+    const revenueResult = await query("SELECT COALESCE(SUM(total), 0)::numeric(10,2) AS totalRevenue FROM orders WHERE payment_status = 'paid'");
+    const totalRevenue = parseFloat(revenueResult.rows[0].totalRevenue);
 
     const productsResult = await query('SELECT COUNT(*)::int FROM products');
     const totalProducts = productsResult.rows[0].count;

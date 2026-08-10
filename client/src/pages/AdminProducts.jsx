@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../api';
+import { formatPrice } from '../utils';
 import toast from 'react-hot-toast';
 import { TableRowSkeleton } from '../components/Skeleton';
 
@@ -378,7 +379,7 @@ export default function AdminProducts() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700">{product.category}</td>
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900">₦{product.price.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{formatPrice(product.price)}</td>
                     <td className="px-4 py-3 text-sm">
                       <span className={`font-medium ${product.stock <= 0 ? 'text-red-600' : product.stock <= 5 ? 'text-yellow-600' : 'text-green-600'}`}>
                         {product.stock}

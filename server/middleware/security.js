@@ -7,11 +7,12 @@ function createSecurityMiddleware(app) {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "https://js.stripe.com"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
         imgSrc: ["'self'", "data:", "https:"],
-        connectSrc: ["'self'", config.corsOrigin],
+        connectSrc: ["'self'", config.corsOrigin, "https://*.stripe.com"],
+        frameSrc: ["'self'", "https://js.stripe.com"],
       },
     },
     crossOriginEmbedderPolicy: false,
@@ -19,7 +20,7 @@ function createSecurityMiddleware(app) {
 
   const generalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 100,
+    max: config.nodeEnv === 'production' ? 100 : 1000,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests, please try again later' },
@@ -27,7 +28,7 @@ function createSecurityMiddleware(app) {
 
   const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 10,
+    max: config.nodeEnv === 'production' ? 10 : 50,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many authentication attempts, please try again later' },
@@ -35,7 +36,7 @@ function createSecurityMiddleware(app) {
 
   const checkoutLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 20,
+    max: config.nodeEnv === 'production' ? 20 : 100,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many checkout attempts, please try again later' },

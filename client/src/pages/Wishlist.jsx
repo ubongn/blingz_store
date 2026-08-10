@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../api';
+import { formatPrice } from '../utils';
 import toast from 'react-hot-toast';
 import { CartSkeleton } from '../components/Skeleton';
 
@@ -71,7 +72,7 @@ export default function Wishlist() {
             </Link>
             <div className="p-4">
               <h3 className="font-semibold text-gray-900 mb-1">{item.name}</h3>
-              <p className="text-lg font-bold text-gray-900 mb-3">₦{item.price.toFixed(2)}</p>
+              <p className="text-lg font-bold text-gray-900 mb-3">{formatPrice(item.price)}</p>
               <div className="flex gap-2">
                 <button
                   onClick={() => handleAddToCart(item.product_id)}

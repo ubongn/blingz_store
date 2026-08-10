@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { apiFetch } from '../api';
+import { formatPrice } from '../utils';
 import { FiHeart } from 'react-icons/fi';
 
 export default function ProductCard({ product }) {
@@ -81,7 +82,7 @@ export default function ProductCard({ product }) {
           <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded mb-2">{product.category}</span>
         )}
         <div className="flex items-center justify-between">
-          <span className="text-lg font-bold text-gray-900">₦{product.price.toFixed(2)}</span>
+          <span className="text-lg font-bold text-gray-900">{formatPrice(product.price)}</span>
           <button
             onClick={handleAddToCart}
             disabled={product.stock <= 0}

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../api';
+import { formatPrice } from '../utils';
 import { FiUsers, FiShoppingCart, FiDollarSign, FiPackage } from 'react-icons/fi';
 
 const STATUS_COLORS = {
@@ -46,7 +47,7 @@ export default function AdminDashboard() {
   if (!stats) return null;
 
   const statCards = [
-    { label: 'Total Revenue', value: `₦${stats.totalRevenue.toLocaleString()}`, icon: FiDollarSign, color: 'text-green-600' },
+    { label: 'Total Revenue', value: `₦${Number(stats.totalRevenue || 0).toLocaleString()}`, icon: FiDollarSign, color: 'text-green-600' },
     { label: 'Total Orders', value: stats.totalOrders, icon: FiShoppingCart, color: 'text-blue-600' },
     { label: 'Total Users', value: stats.totalUsers, icon: FiUsers, color: 'text-purple-600' },
     { label: 'Total Products', value: stats.totalProducts, icon: FiPackage, color: 'text-orange-600' },
@@ -128,7 +129,7 @@ export default function AdminDashboard() {
                   <tr key={order.id} className="hover:bg-gray-50">
                     <td className="px-3 py-2 text-sm font-medium text-gray-900">#{order.id}</td>
                     <td className="px-3 py-2 text-sm text-gray-700">{order.full_name}</td>
-                    <td className="px-3 py-2 text-sm font-medium text-gray-900">₦{order.total.toFixed(2)}</td>
+                    <td className="px-3 py-2 text-sm font-medium text-gray-900">{formatPrice(order.total)}</td>
                     <td className="px-3 py-2">
                       <span className={`text-xs px-2 py-1 rounded font-medium ${STATUS_COLORS[order.status] || 'bg-gray-100 text-gray-800'}`}>
                         {order.status}
